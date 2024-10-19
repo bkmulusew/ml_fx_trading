@@ -7,14 +7,14 @@ class TradingStrategy():
         self.frac_kelly = frac_kelly
         self.trade_threshold = trade_threshold
         # Initialize wallets for different trading strategies
-        self.wallet_a = {'mean_reversion': wallet_a, 'pure_forcasting': wallet_a, 'hybrid': wallet_a}
-        self.wallet_b = {'mean_reversion': wallet_b, 'pure_forcasting': wallet_b, 'hybrid': wallet_b}
+        self.wallet_a = {'mean_reversion': wallet_a, 'trend': wallet_a, 'pure_forcasting': wallet_a, 'hybrid_mean_reversion': wallet_a, 'hybrid_trend': wallet_a}
+        self.wallet_b = {'mean_reversion': wallet_b, 'trend': wallet_b, 'pure_forcasting': wallet_b, 'hybrid_mean_reversion': wallet_b, 'hybrid_trend': wallet_b}
         # Track profit/loss, wins/losses, and total gains/losses for each strategy
-        self.total_profit_or_loss = {'mean_reversion': 0, 'pure_forcasting': 0, 'hybrid': 0}
-        self.num_wins = {'mean_reversion': 0, 'pure_forcasting': 0, 'hybrid': 0}
-        self.total_gains = {'mean_reversion': 0, 'pure_forcasting': 0, 'hybrid': 0}
-        self.num_losses = {'mean_reversion': 0, 'pure_forcasting': 0, 'hybrid': 0}
-        self.total_losses = {'mean_reversion': 0, 'pure_forcasting': 0, 'hybrid': 0}
+        self.total_profit_or_loss = {'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0}
+        self.num_wins = {'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0}
+        self.num_losses = {'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0}
+        self.total_gains = {'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0}
+        self.total_losses = {'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0}
     
     def win_loss_ratio(self, strategy_name):
         """Calculate the win/loss ratio for a given strategy."""
@@ -50,13 +50,13 @@ class TradingStrategy():
             # Execute a 'buy_currency_a' trade, converting currency B to currency A
             bet_size = f_i * self.wallet_b[strategy_name] * kelly_factor
             currency_a_bought = bet_size / curr_ratio # Convert bet_size from currency B to currency A
-            profit = currency_a_bought * next_ratio - bet_size # Calculate profit by selling currency A at next time step
+            profit = (currency_a_bought * next_ratio) - bet_size # Calculate profit by selling currency A at next time step
             self.wallet_b[strategy_name] += profit # Update wallet B with the profit/loss
         elif trade_direction == 'sell_currency_a':
             # Execute a 'sell_currency_a' trade, converting currency A to currency B
             bet_size = f_i * self.wallet_a[strategy_name] * kelly_factor
-            currency_a_sold = bet_size * curr_ratio # Convert bet_size from currency A to currency B
-            profit = currency_a_sold / next_ratio - bet_size # Calculate profit by buying back currency A at next time step
+            currency_b_bought = bet_size * curr_ratio # Convert bet_size from currency A to currency B
+            profit = (currency_b_bought / next_ratio) - bet_size # Calculate profit by buying back currency A at next time step
             self.wallet_a[strategy_name] += profit # Update wallet A with the profit/loss
         return profit
 
@@ -70,6 +70,14 @@ class TradingStrategy():
                 return 'buy_currency_a'
             else:
                 return 'no_trade'
+        elif(strategy_name == 'trend'):
+            # Trend strategy: trade towards significant ratio changes
+            if base_ratio_change > self.trade_threshold:
+                return 'buy_currency_a'
+            elif base_ratio_change < -self.trade_threshold:
+                return 'sell_currency_a'
+            else:
+                return 'no_trade'
         elif(strategy_name == 'pure_forcasting'):
             # Pure forecasting strategy: trade based on predicted future ratio changes
             if predicted_ratio_change > self.trade_threshold:
@@ -78,11 +86,19 @@ class TradingStrategy():
                 return 'sell_currency_a'
             else:
                 return 'no_trade'
-        elif(strategy_name == 'hybrid'):
+        elif(strategy_name == 'hybrid_mean_reversion'):
             # Hybrid strategy: combine mean reversion and pure forecasting signals
             if base_ratio_change < -self.trade_threshold and predicted_ratio_change > self.trade_threshold:
                 return 'buy_currency_a'
             elif base_ratio_change > self.trade_threshold and predicted_ratio_change < -self.trade_threshold:
+                return 'sell_currency_a'
+            else:
+                return 'no_trade'
+        elif(strategy_name == 'hybrid_trend'):
+            # Hybrid strategy: combine trend and pure forecasting signals
+            if base_ratio_change > self.trade_threshold and predicted_ratio_change > self.trade_threshold:
+                return 'buy_currency_a'
+            elif base_ratio_change < -self.trade_threshold and predicted_ratio_change < -self.trade_threshold:
                 return 'sell_currency_a'
             else:
                 return 'no_trade'
@@ -100,7 +116,7 @@ class TradingStrategy():
         
     def simulate_trading_with_strategies(self, actual_rates, predicted_rates):
         """Simulate trading over a series of exchange rates using different strategies."""
-        strategy_names = ['mean_reversion', 'pure_forcasting', 'hybrid']
+        strategy_names = ['mean_reversion', 'trend', 'pure_forcasting', 'hybrid_mean_reversion', 'hybrid_trend']
         
         for strategy_name in strategy_names:
             for i in range(2, len(actual_rates)):
