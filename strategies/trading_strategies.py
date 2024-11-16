@@ -211,7 +211,7 @@ class TradingStrategy():
         strategy_names = ['mean_reversion', 'trend', 'pure_forcasting', 'hybrid_mean_reversion', 'hybrid_trend']
         
         for strategy_name in strategy_names:
-            for i in range(2, len(actual_rates)):
+            for i in range(2, len(actual_rates) - 1):
                 curr_ratio = actual_rates[i - 1]
                 prev_ratio = actual_rates[i - 2]
                 predicted_next_ratio = predicted_rates[i]
@@ -238,6 +238,13 @@ class TradingStrategy():
                 elif profit < 0:
                     self.num_losses[strategy_name] += 1
                     self.total_losses[strategy_name] += abs(profit)
+
+        # Close any remaining open positions for all strategies
+        for strategy_name in strategy_names:
+            if self.open_positions[strategy_name]['type'] is not None:
+                final_ratio = actual_rates[-1]  # Use the last ratio for closing
+                profit = self.close_position(strategy_name, final_ratio)
+                self.total_profit_or_loss[strategy_name] += profit
 
         # Display the overall results after simulation
         self.display_total_profit()
