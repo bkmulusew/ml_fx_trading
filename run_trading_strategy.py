@@ -94,7 +94,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--trade_thresholds", 
         type=str, 
-        default="0,0.000025,0.00005,0.0001", 
+        default="0", 
+        # default="0,0.000025,0.00005,0.0001", 
         help="List of threshold values to determine the trade direction and wether to trade based on changes in currency ratio. \
             Provide the values as a comma-separated list of 4 values. For example, '--trade_thresholds 0,0.00025,0.0005,0.001' sets thresholds for trade actions."
     )
