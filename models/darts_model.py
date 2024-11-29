@@ -99,7 +99,7 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
 
     def split_and_scale_data(self, train_ratio=0.5, validation_ratio=0.1):
         """Splits the data into training, validation, and test sets and applies scaling."""
-        series = self.data_processor.get_ratio_time_series()
+        dates, series = self.data_processor.get_ratio_time_series()
 
         num_observations = len(series)
         train_end_index = int(num_observations * train_ratio)
@@ -108,6 +108,8 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
         train_series = series[:train_end_index]
         val_series = series[train_end_index:validation_end_index]
         test_series = series[validation_end_index:]
+        test_dates = dates[validation_end_index:]
+        test_dates = test_dates[self.model_config.INPUT_CHUNK_LENGTH:]
 
         # Scaling the data
         self.scaler = Scaler()
@@ -115,7 +117,7 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
         valid_series_scaled = self.scaler.transform(val_series)
         test_series_scaled = self.scaler.transform(test_series)
 
-        return train_series_scaled, valid_series_scaled, test_series_scaled
+        return train_series_scaled, valid_series_scaled, test_series_scaled, test_dates
 
     def train(self, train_series, validation_series):
         """Trains the model."""

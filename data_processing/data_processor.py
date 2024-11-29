@@ -17,8 +17,10 @@ class DataProcessor:
         """Converts the ratio column to a time series object."""
         df = self.load_and_prepare_data()
         # Select the second column dynamically
+        first_column_name = df.columns[0]
         second_column_name = df.columns[1]
-        return TimeSeries.from_dataframe(df, value_cols=[second_column_name])
+        dates = df[first_column_name].tolist()
+        return dates, TimeSeries.from_dataframe(df, value_cols=[second_column_name])
 
     def get_test_columns(self, test_size):
         """Retrieves the test dataset's numerator and denominator columns."""
