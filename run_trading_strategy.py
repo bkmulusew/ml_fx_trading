@@ -69,6 +69,11 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     trend_coeffs = []
     forecasting_coeffs = []
 
+    trend_num_trades = []
+    forecasting_num_trades = []
+    hybrid_num_trades = []
+    ensamble_num_trades = []
+
     # Chunk true_values and predicted_values by date
     for date, true_val, pred_val in zip(parsed_dates, true_values, predicted_values):
         date_key = date.date()  # Use only the date part as the key
@@ -98,6 +103,11 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
             ensamble_profit_per_trade.append(ensamble_profit_per_trade_val)
             trend_coeffs.append(trading_strategy.trend_coeff)
             forecasting_coeffs.append(trading_strategy.forecasting_coeff)
+
+            trend_num_trades.append(trading_strategy.num_trades["trend"])
+            forecasting_num_trades.append(trading_strategy.num_trades["pure_forcasting"])
+            hybrid_num_trades.append(trading_strategy.num_trades["hybrid_trend"])
+            ensamble_num_trades.append(trading_strategy.num_trades["ensamble"])
         # trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.FRAC_KELLY, trade_thresold)
         # trading_strategy.simulate_trading_with_strategies(true_values, predicted_values)
             
@@ -105,6 +115,31 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     cumulative_forecasting_profit = np.cumsum(forecasting_profit)
     cumulative_hybrid_profit = np.cumsum(hybrid_profit)
     cumulative_ensamble_profit = np.cumsum(ensamble_profit)
+
+    cumulative_trend_profit_per_trade = [
+        np.sum(trend_profit[:i+1]) / np.sum(trend_num_trades[:i+1]) for i in range(len(trend_profit))
+    ]
+    cumulative_forecasting_profit_per_trade = [
+        np.sum(forecasting_profit[:i+1]) / np.sum(forecasting_num_trades[:i+1]) for i in range(len(forecasting_profit))
+    ]
+    cumulative_hybrid_profit_per_trade = [
+        np.sum(hybrid_profit[:i+1]) / np.sum(hybrid_num_trades[:i+1]) for i in range(len(hybrid_profit))
+    ]
+    cumulative_ensamble_profit_per_trade = [
+        np.sum(ensamble_profit[:i+1]) / np.sum(ensamble_num_trades[:i+1]) for i in range(len(ensamble_profit))
+    ]
+
+    plt.plot(cumulative_trend_profit_per_trade, color='blue', label='Cumulative Trend Profit Per Trade')
+    plt.plot(cumulative_forecasting_profit_per_trade, color='red', label='Cumulative Forecasting Profit Per Trade')
+    plt.plot(cumulative_hybrid_profit_per_trade, color='green', label='Cumulative Hybrid Profit Per Trade')
+    plt.plot(cumulative_ensamble_profit_per_trade, color='orange', label='Cumulative Ensamble Profit Per Trade')
+    plt.title('Cumulative Trend and Forecasting Profits Per Trade Using Kelly')
+    plt.xlabel('Observation')
+    plt.ylabel('Cumulative Profit Per Trade')
+    plt.legend()
+    plt.savefig('cumulative_trend_vs_forecasting_profits_per_trade_kelly.png', dpi=300, bbox_inches='tight')
+
+    plt.clf()
 
     plt.plot(trend_coeffs, color='blue', label='Trend Coefficient')
     plt.plot(forecasting_coeffs, color='red', label='Forecasting Coefficient')
@@ -163,6 +198,11 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     hybrid_profit_per_trade = []
     ensamble_profit_per_trade = []
 
+    trend_num_trades = []
+    forecasting_num_trades = []
+    hybrid_num_trades = []
+    ensamble_num_trades = []
+
     # Simulate trading using each of the specified trade thresholds.
     for trade_thresold in trade_thresholds:
         print(f"Trade Threshold: {trade_thresold}")
@@ -182,6 +222,11 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
             forecasting_profit_per_trade.append(forecasting_profit_per_trade_val)
             hybrid_profit_per_trade.append(hybrid_profit_per_trade_val)
             ensamble_profit_per_trade.append(ensamble_profit_per_trade_val)
+
+            trend_num_trades.append(trading_strategy.num_trades["trend"])
+            forecasting_num_trades.append(trading_strategy.num_trades["pure_forcasting"])
+            hybrid_num_trades.append(trading_strategy.num_trades["hybrid_trend"])
+            ensamble_num_trades.append(trading_strategy.num_trades["ensamble"])
         # trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.FRAC_KELLY, trade_thresold)
         # trading_strategy.simulate_trading_with_strategies(true_values, predicted_values)
             
@@ -189,6 +234,31 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     cumulative_forecasting_profit = np.cumsum(forecasting_profit)
     cumulative_hybrid_profit = np.cumsum(hybrid_profit)
     cumulative_ensamble_profit = np.cumsum(ensamble_profit)
+
+    cumulative_trend_profit_per_trade = [
+        np.sum(trend_profit[:i+1]) / np.sum(trend_num_trades[:i+1]) for i in range(len(trend_profit))
+    ]
+    cumulative_forecasting_profit_per_trade = [
+        np.sum(forecasting_profit[:i+1]) / np.sum(forecasting_num_trades[:i+1]) for i in range(len(forecasting_profit))
+    ]
+    cumulative_hybrid_profit_per_trade = [
+        np.sum(hybrid_profit[:i+1]) / np.sum(hybrid_num_trades[:i+1]) for i in range(len(hybrid_profit))
+    ]
+    cumulative_ensamble_profit_per_trade = [
+        np.sum(ensamble_profit[:i+1]) / np.sum(ensamble_num_trades[:i+1]) for i in range(len(ensamble_profit))
+    ]
+
+    plt.plot(cumulative_trend_profit_per_trade, color='blue', label='Cumulative Trend Profit Per Trade')
+    plt.plot(cumulative_forecasting_profit_per_trade, color='red', label='Cumulative Forecasting Profit Per Trade')
+    plt.plot(cumulative_hybrid_profit_per_trade, color='green', label='Cumulative Hybrid Profit Per Trade')
+    plt.plot(cumulative_ensamble_profit_per_trade, color='orange', label='Cumulative Ensamble Profit Per Trade')
+    plt.title('Cumulative Trend and Forecasting Profits Per Trade Using Fixed Postion Size')
+    plt.xlabel('Observation')
+    plt.ylabel('Cumulative Profit Per Trade')
+    plt.legend()
+    plt.savefig('cumulative_trend_vs_forecasting_profits_per_trade_fixed.png', dpi=300, bbox_inches='tight')
+
+    plt.clf()
 
     plt.plot(cumulative_trend_profit, color='blue', label='Cumulative Trend Profit')
     plt.plot(cumulative_forecasting_profit, color='red', label='Cumulative Forecasting Profit')
