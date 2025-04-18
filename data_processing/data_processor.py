@@ -17,10 +17,29 @@ class DataProcessor:
         """Converts the ratio column to a time series object."""
         df = self.load_and_prepare_data()
         # Select the second column dynamically
-        first_column_name = df.columns[0]
-        second_column_name = df.columns[1]
-        dates = df[first_column_name].tolist()
-        return dates, TimeSeries.from_dataframe(df, value_cols=[second_column_name])
+        # date_column = df.columns[0]
+        # fx_column = df.columns[1]
+        # without_prompt_column = df.columns[2]
+        # with_prompt_column = df.columns[3]
+        # dates_list = df[date_column].tolist()
+        # without_prompt_list = df[without_prompt_column].tolist()
+        # with_prompt_list = df[with_prompt_column].tolist()
+        # return dates_list, TimeSeries.from_dataframe(df, value_cols=[fx_column]), with_prompt_list, without_prompt_list
+
+        # ------------
+
+        date_column = df.columns[0]
+        ask_price_column = df.columns[1]
+        bid_price_column = df.columns[2]
+        mid_price_column = df.columns[3]
+        without_prompt_column = df.columns[5]
+        with_prompt_column = df.columns[6]
+        dates_list = df[date_column].tolist()
+        bid_prices_list = df[bid_price_column].tolist()
+        ask_prices_list = df[ask_price_column].tolist()
+        without_prompt_list = df[without_prompt_column].tolist()
+        with_prompt_list = df[with_prompt_column].tolist()
+        return dates_list, bid_prices_list, ask_prices_list, TimeSeries.from_dataframe(df, value_cols=[mid_price_column]), with_prompt_list, without_prompt_list
 
     def get_test_columns(self, test_size):
         """Retrieves the test dataset's numerator and denominator columns."""

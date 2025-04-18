@@ -99,17 +99,30 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
 
     def split_and_scale_data(self, train_ratio=0.5, validation_ratio=0.1):
         """Splits the data into training, validation, and test sets and applies scaling."""
-        dates, series = self.data_processor.get_ratio_time_series()
+        dates, bid_prices, ask_prices, mid_price, with_prompt, without_prompt = self.data_processor.get_ratio_time_series()
 
-        num_observations = len(series)
+        num_observations = len(mid_price)
         train_end_index = int(num_observations * train_ratio)
         validation_end_index = int(num_observations * (train_ratio + validation_ratio))
 
-        train_series = series[:train_end_index]
-        val_series = series[train_end_index:validation_end_index]
-        test_series = series[validation_end_index:]
+        train_series = mid_price[:train_end_index]
+        val_series = mid_price[train_end_index:validation_end_index]
+        test_series = mid_price[validation_end_index:]
+        
         test_dates = dates[validation_end_index:]
         test_dates = test_dates[self.model_config.INPUT_CHUNK_LENGTH:]
+
+        test_bid_prices = bid_prices[validation_end_index:]
+        test_bid_prices = test_bid_prices[self.model_config.INPUT_CHUNK_LENGTH:]
+
+        test_ask_prices = ask_prices[validation_end_index:]
+        test_ask_prices = test_ask_prices[self.model_config.INPUT_CHUNK_LENGTH:]
+
+        test_without_prompt = without_prompt[validation_end_index:]
+        test_without_prompt = test_without_prompt[self.model_config.INPUT_CHUNK_LENGTH:]
+
+        test_with_prompt = with_prompt[validation_end_index:]
+        test_with_prompt = test_with_prompt[self.model_config.INPUT_CHUNK_LENGTH:]
 
         # Scaling the data
         self.scaler = Scaler()
@@ -117,7 +130,7 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
         valid_series_scaled = self.scaler.transform(val_series)
         test_series_scaled = self.scaler.transform(test_series)
 
-        return train_series_scaled, valid_series_scaled, test_series_scaled, test_dates
+        return train_series_scaled, valid_series_scaled, test_series_scaled, test_dates, test_bid_prices, test_ask_prices, test_with_prompt, test_without_prompt
 
     def train(self, train_series, validation_series):
         """Trains the model."""

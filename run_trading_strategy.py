@@ -9,6 +9,7 @@ import argparse
 from strategies import TradingStrategy
 from collections import defaultdict
 from datetime import datetime
+import pandas as pd
 
 def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     """Run a trading strategy based on a supervised learning model, including model training, prediction,
@@ -28,7 +29,7 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
         true_values = generated_values['true_values']
     else:
         predictor = DartsFinancialForecastingModel(model_name, dataProcessor, model_config)
-        train_series, valid_series, test_series, test_dates = predictor.split_and_scale_data()
+        train_series, valid_series, test_series, test_dates, test_bid_prices, test_ask_prices, test_with_prompt, test_without_prompt = predictor.split_and_scale_data()
         predictor.train(train_series, valid_series)
         predicted_values = predictor.generate_predictions(test_series)
         true_values = predictor.get_true_values(test_series)
@@ -53,34 +54,51 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     print(f"Model: {model_name}")
 
     # Parse test_dates into datetime objects
-    parsed_dates = [datetime.strptime(date, "%d/%m/%Y %H:%M:%S") for date in test_dates]
+    # parsed_dates = [datetime.strptime(date, "%d/%m/%Y %H:%M:%S") for date in test_dates]
+
+    # parsed_dates = [datetime.strptime(date, "%m/%d/%y %H:%M") for date in test_dates]
+    parsed_dates = [datetime.strptime(date, '%Y-%m-%d %H:%M:%S') for date in test_dates]
 
     # Create a dictionary to group values by date
-    chunked_values = defaultdict(lambda: {"true_values": [], "predicted_values": []})
-
-    trend_profit = []
-    forecasting_profit = []
-    hybrid_profit = []
-    ensamble_profit = []
-    trend_profit_per_trade = []
-    forecasting_profit_per_trade = []
-    hybrid_profit_per_trade = []
-    ensamble_profit_per_trade = []
-    trend_coeffs = []
-    forecasting_coeffs = []
-
-    trend_num_trades = []
-    forecasting_num_trades = []
-    hybrid_num_trades = []
-    ensamble_num_trades = []
+    chunked_values = defaultdict(lambda: {"true_values": [], "predicted_values": [], "bid_price":[], "ask_price":[], "with_prompt": [], "without_prompt": []})
 
     # Chunk true_values and predicted_values by date
-    for date, true_val, pred_val in zip(parsed_dates, true_values, predicted_values):
+    for date, true_val, pred_val, bid_price, ask_price, with_prompt, without_prompt in zip(parsed_dates, true_values, predicted_values, test_bid_prices, test_ask_prices, test_with_prompt, test_without_prompt):
         date_key = date.date()  # Use only the date part as the key
         chunked_values[date_key]["true_values"].append(true_val)
         chunked_values[date_key]["predicted_values"].append(pred_val)
+        chunked_values[date_key]["bid_price"].append(bid_price)
+        chunked_values[date_key]["ask_price"].append(ask_price)
+        chunked_values[date_key]["with_prompt"].append(with_prompt)
+        chunked_values[date_key]["without_prompt"].append(without_prompt)
 
     # Use Kelly
+
+    print("--------------------------------")
+    print("Using Kelly")
+    print("--------------------------------")
+    mean_reversion_profit = []
+    trend_profit = []
+    forecasting_profit = []
+    ensemble_with_llm_trend_profit = []
+    ensemble_with_llm_mean_reversion_profit = []
+
+    mean_reversion_profit_per_trade = []
+    trend_profit_per_trade = []
+    forecasting_profit_per_trade = []
+    ensemble_with_llm_trend_profit_per_trade = []
+    ensemble_with_llm_mean_reversion_profit_per_trade = []
+
+    mean_reversion_coeffs = []
+    trend_coeffs = []
+    forecasting_coeffs = []
+    llm_sentiment_coeffs = []
+
+    mean_reversion_num_trades = []
+    trend_num_trades = []
+    forecasting_num_trades = []
+    ensemble_with_llm_trend_num_trades = []
+    ensemble_with_llm_mean_reversion_num_trades = []
 
     # Simulate trading using each of the specified trade thresholds.
     for trade_thresold in trade_thresholds:
@@ -88,51 +106,61 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
         # Print the results
         for date_key, values in chunked_values.items():
             trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.FRAC_KELLY, trade_thresold)
-            trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'])
+            trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["with_prompt"])
+            mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
             trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
             forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])
-            hybrid_profit.append(trading_strategy.total_profit_or_loss["hybrid_trend"])
-            ensamble_profit.append(trading_strategy.total_profit_or_loss["ensamble"])
+            ensemble_with_llm_trend_profit.append(trading_strategy.total_profit_or_loss["ensemble_with_llm_trend"])
+            ensemble_with_llm_mean_reversion_profit.append(trading_strategy.total_profit_or_loss["ensemble_with_llm_mean_reversion"])
+            mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["mean_reversion"] / trading_strategy.num_trades["mean_reversion"]
             trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["trend"] / trading_strategy.num_trades["trend"]
             forecasting_profit_per_trade_val = trading_strategy.total_profit_or_loss["pure_forcasting"] / trading_strategy.num_trades["pure_forcasting"]
-            hybrid_profit_per_trade_val = trading_strategy.total_profit_or_loss["hybrid_trend"] / trading_strategy.num_trades["hybrid_trend"]
-            ensamble_profit_per_trade_val = trading_strategy.total_profit_or_loss["ensamble"] / trading_strategy.num_trades["ensamble"]
+            ensemble_with_llm_trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["ensemble_with_llm_trend"] / trading_strategy.num_trades["ensemble_with_llm_trend"]
+            ensemble_with_llm_mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["ensemble_with_llm_mean_reversion"] / trading_strategy.num_trades["ensemble_with_llm_mean_reversion"]
+            mean_reversion_profit_per_trade.append(mean_reversion_profit_per_trade_val)
             trend_profit_per_trade.append(trend_profit_per_trade_val)
             forecasting_profit_per_trade.append(forecasting_profit_per_trade_val)
-            hybrid_profit_per_trade.append(hybrid_profit_per_trade_val)
-            ensamble_profit_per_trade.append(ensamble_profit_per_trade_val)
-            trend_coeffs.append(trading_strategy.trend_coeff)
-            forecasting_coeffs.append(trading_strategy.forecasting_coeff)
+            ensemble_with_llm_trend_profit_per_trade.append(ensemble_with_llm_trend_profit_per_trade_val)
+            ensemble_with_llm_mean_reversion_profit_per_trade.append(ensemble_with_llm_mean_reversion_profit_per_trade_val)
+            
+            mean_reversion_coeffs.append(trading_strategy.mean_reversion_coeff_llm)
+            trend_coeffs.append(trading_strategy.trend_coeff_llm)
+            forecasting_coeffs.append(trading_strategy.forecasting_coeff_llm)
+            llm_sentiment_coeffs.append(trading_strategy.llm_sentiment_coeff)
 
+            mean_reversion_num_trades.append(trading_strategy.num_trades["mean_reversion"])
             trend_num_trades.append(trading_strategy.num_trades["trend"])
             forecasting_num_trades.append(trading_strategy.num_trades["pure_forcasting"])
-            hybrid_num_trades.append(trading_strategy.num_trades["hybrid_trend"])
-            ensamble_num_trades.append(trading_strategy.num_trades["ensamble"])
-        # trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.FRAC_KELLY, trade_thresold)
-        # trading_strategy.simulate_trading_with_strategies(true_values, predicted_values)
+            ensemble_with_llm_trend_num_trades.append(trading_strategy.num_trades["ensemble_with_llm_trend"])
+            ensemble_with_llm_mean_reversion_num_trades.append(trading_strategy.num_trades["ensemble_with_llm_mean_reversion"])
             
+    cumulative_mean_reversion_profit = np.cumsum(mean_reversion_profit)
     cumulative_trend_profit = np.cumsum(trend_profit)
     cumulative_forecasting_profit = np.cumsum(forecasting_profit)
-    cumulative_hybrid_profit = np.cumsum(hybrid_profit)
-    cumulative_ensamble_profit = np.cumsum(ensamble_profit)
+    cumulative_ensemble_with_llm_trend_profit = np.cumsum(ensemble_with_llm_trend_profit)
+    cumulative_ensemble_with_llm_mean_reversion_profit = np.cumsum(ensemble_with_llm_mean_reversion_profit)
 
+    cumulative_mean_reversion_profit_per_trade = [
+        np.sum(mean_reversion_profit[:i+1]) / np.sum(mean_reversion_num_trades[:i+1]) for i in range(len(mean_reversion_profit))
+    ]
     cumulative_trend_profit_per_trade = [
         np.sum(trend_profit[:i+1]) / np.sum(trend_num_trades[:i+1]) for i in range(len(trend_profit))
     ]
     cumulative_forecasting_profit_per_trade = [
         np.sum(forecasting_profit[:i+1]) / np.sum(forecasting_num_trades[:i+1]) for i in range(len(forecasting_profit))
     ]
-    cumulative_hybrid_profit_per_trade = [
-        np.sum(hybrid_profit[:i+1]) / np.sum(hybrid_num_trades[:i+1]) for i in range(len(hybrid_profit))
+    cumulative_ensemble_with_llm_trend_profit_per_trade = [
+        np.sum(ensemble_with_llm_trend_profit[:i+1]) / np.sum(ensemble_with_llm_trend_num_trades[:i+1]) for i in range(len(ensemble_with_llm_trend_profit))
     ]
-    cumulative_ensamble_profit_per_trade = [
-        np.sum(ensamble_profit[:i+1]) / np.sum(ensamble_num_trades[:i+1]) for i in range(len(ensamble_profit))
+    cumulative_ensemble_with_llm_mean_reversion_profit_per_trade = [
+        np.sum(ensemble_with_llm_mean_reversion_profit[:i+1]) / np.sum(ensemble_with_llm_mean_reversion_num_trades[:i+1]) for i in range(len(ensemble_with_llm_mean_reversion_profit))
     ]
 
+    plt.plot(cumulative_mean_reversion_profit_per_trade, color='purple', label='Cumulative Mean Reversion Profit Per Trade')
     plt.plot(cumulative_trend_profit_per_trade, color='blue', label='Cumulative Trend Profit Per Trade')
     plt.plot(cumulative_forecasting_profit_per_trade, color='red', label='Cumulative Forecasting Profit Per Trade')
-    plt.plot(cumulative_hybrid_profit_per_trade, color='green', label='Cumulative Hybrid Profit Per Trade')
-    plt.plot(cumulative_ensamble_profit_per_trade, color='orange', label='Cumulative Ensamble Profit Per Trade')
+    plt.plot(cumulative_ensemble_with_llm_trend_profit_per_trade, color='green', label='Cumulative Ensemble With LLM Trend Profit Per Trade')
+    plt.plot(cumulative_ensemble_with_llm_mean_reversion_profit_per_trade, color='orange', label='Cumulative Ensemble With LLM Mean Reversion Profit Per Trade')
     plt.title('Cumulative Trend and Forecasting Profits Per Trade Using Kelly')
     plt.xlabel('Observation')
     plt.ylabel('Cumulative Profit Per Trade')
@@ -141,9 +169,11 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
 
     plt.clf()
 
+    plt.plot(mean_reversion_coeffs, color='purple', label='Mean Reversion Coefficient')
     plt.plot(trend_coeffs, color='blue', label='Trend Coefficient')
     plt.plot(forecasting_coeffs, color='red', label='Forecasting Coefficient')
-    plt.title('Trend and Forecasting Coefficients')
+    plt.plot(llm_sentiment_coeffs, color='green', label='LLM Coefficient')
+    plt.title('Trend, Forecasting, and LLM Coefficients Using Kelly')
     plt.xlabel('Observation')
     plt.ylabel('Coefficient')
     plt.legend()
@@ -151,10 +181,11 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
 
     plt.clf()
 
+    plt.plot(cumulative_mean_reversion_profit, color='purple', label='Cumulative Mean Reversion Profit')
     plt.plot(cumulative_trend_profit, color='blue', label='Cumulative Trend Profit')
     plt.plot(cumulative_forecasting_profit, color='red', label='Cumulative Forecasting Profit')
-    plt.plot(cumulative_hybrid_profit, color='green', label='Cumulative Hybrid Profit')
-    plt.plot(cumulative_ensamble_profit, color='orange', label='Cumulative Ensamble Profit')
+    plt.plot(cumulative_ensemble_with_llm_trend_profit, color='green', label='Cumulative Ensemble With LLM Trend Profit')
+    plt.plot(cumulative_ensemble_with_llm_mean_reversion_profit, color='orange', label='Cumulative Ensemble With LLM Mean Reversion Profit')
     plt.title('Cumulative Trend and Forecasting Profits Using Kelly')
     plt.xlabel('Observation')
     plt.ylabel('Cumulative Profit')
@@ -163,10 +194,11 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
 
     plt.clf()
 
+    plt.plot(mean_reversion_profit, color='purple', label='Mean Reversion Profit')
     plt.plot(trend_profit, color = 'blue', label = 'Trend Profit')
     plt.plot(forecasting_profit, color = 'red', label = 'Forcasting Profit')
-    plt.plot(hybrid_profit, color = 'green', label = 'Hybrid Profit')
-    plt.plot(ensamble_profit, color='orange', label='Ensamble Profit')
+    plt.plot(ensemble_with_llm_trend_profit, color='green', label='Ensemble With LLM Trend Profit')
+    plt.plot(ensemble_with_llm_mean_reversion_profit, color='orange', label='Ensemble With LLM Mean Reversion Profit')
     plt.title('Trend and Forcasting Profits Using Kelly')
     plt.xlabel('Observation')
     plt.ylabel('Profit')
@@ -175,10 +207,11 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
 
     plt.clf()
 
+    plt.plot(mean_reversion_profit_per_trade, color='purple', label='Mean Reversion Profit Per Trade')
     plt.plot(trend_profit_per_trade, color = 'blue', label = 'Trend Profit Per Trade')
     plt.plot(forecasting_profit_per_trade, color = 'red', label = 'Forcasting Profit Per Trade')
-    plt.plot(hybrid_profit_per_trade, color = 'green', label = 'Hybrid Profit Per Trade')
-    plt.plot(ensamble_profit_per_trade, color='orange', label='Ensamble Profit Per Trade')
+    plt.plot(ensemble_with_llm_trend_profit_per_trade, color='green', label='Ensemble With LLM Trend Profit Per Trade')
+    plt.plot(ensemble_with_llm_mean_reversion_profit_per_trade, color='orange', label='Ensemble With LLM Mean Reversion Profit Per Trade')
     plt.title('Trend and Forcasting Profit Per Trade Using Kelly')
     plt.xlabel('Observation')
     plt.ylabel('Profit Per Trade')
@@ -188,20 +221,33 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     plt.clf()
 
     # Use Fixed Position
+    
+    print("--------------------------------")
+    print("Using Fixed Position")
+    print("--------------------------------")
 
+    mean_reversion_profit = []
     trend_profit = []
     forecasting_profit = []
-    hybrid_profit = []
-    ensamble_profit = []
+    ensemble_with_llm_trend_profit = []
+    ensemble_with_llm_mean_reversion_profit = []
+
+    mean_reversion_profit_per_trade = []
     trend_profit_per_trade = []
     forecasting_profit_per_trade = []
-    hybrid_profit_per_trade = []
-    ensamble_profit_per_trade = []
+    ensemble_with_llm_trend_profit_per_trade = []
+    ensemble_with_llm_mean_reversion_profit_per_trade = []
 
+    mean_reversion_coeffs = []
+    trend_coeffs = []
+    forecasting_coeffs = []
+    llm_sentiment_coeffs = []
+
+    mean_reversion_num_trades = []
     trend_num_trades = []
     forecasting_num_trades = []
-    hybrid_num_trades = []
-    ensamble_num_trades = []
+    ensemble_with_llm_trend_num_trades = []
+    ensemble_with_llm_mean_reversion_num_trades = []
 
     # Simulate trading using each of the specified trade thresholds.
     for trade_thresold in trade_thresholds:
@@ -209,49 +255,61 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
         # Print the results
         for date_key, values in chunked_values.items():
             trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.FRAC_KELLY, trade_thresold)
-            trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], use_kelly=False)
+            trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["with_prompt"], use_kelly=False)
+            mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
             trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
             forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])
-            hybrid_profit.append(trading_strategy.total_profit_or_loss["hybrid_trend"])
-            ensamble_profit.append(trading_strategy.total_profit_or_loss["ensamble"])
+            ensemble_with_llm_trend_profit.append(trading_strategy.total_profit_or_loss["ensemble_with_llm_trend"])
+            ensemble_with_llm_mean_reversion_profit.append(trading_strategy.total_profit_or_loss["ensemble_with_llm_mean_reversion"])
+            mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["mean_reversion"] / trading_strategy.num_trades["mean_reversion"]
             trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["trend"] / trading_strategy.num_trades["trend"]
             forecasting_profit_per_trade_val = trading_strategy.total_profit_or_loss["pure_forcasting"] / trading_strategy.num_trades["pure_forcasting"]
-            hybrid_profit_per_trade_val = trading_strategy.total_profit_or_loss["hybrid_trend"] / trading_strategy.num_trades["hybrid_trend"]
-            ensamble_profit_per_trade_val = trading_strategy.total_profit_or_loss["ensamble"] / trading_strategy.num_trades["ensamble"]
+            ensemble_with_llm_trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["ensemble_with_llm_trend"] / trading_strategy.num_trades["ensemble_with_llm_trend"]
+            ensemble_with_llm_mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["ensemble_with_llm_mean_reversion"] / trading_strategy.num_trades["ensemble_with_llm_mean_reversion"]
+            mean_reversion_profit_per_trade.append(mean_reversion_profit_per_trade_val)
             trend_profit_per_trade.append(trend_profit_per_trade_val)
             forecasting_profit_per_trade.append(forecasting_profit_per_trade_val)
-            hybrid_profit_per_trade.append(hybrid_profit_per_trade_val)
-            ensamble_profit_per_trade.append(ensamble_profit_per_trade_val)
+            ensemble_with_llm_trend_profit_per_trade.append(ensemble_with_llm_trend_profit_per_trade_val)
+            ensemble_with_llm_mean_reversion_profit_per_trade.append(ensemble_with_llm_mean_reversion_profit_per_trade_val)
 
+            mean_reversion_coeffs.append(trading_strategy.mean_reversion_coeff_llm)
+            trend_coeffs.append(trading_strategy.trend_coeff_llm)
+            forecasting_coeffs.append(trading_strategy.forecasting_coeff_llm)
+            llm_sentiment_coeffs.append(trading_strategy.llm_sentiment_coeff)
+
+            mean_reversion_num_trades.append(trading_strategy.num_trades["mean_reversion"])
             trend_num_trades.append(trading_strategy.num_trades["trend"])
             forecasting_num_trades.append(trading_strategy.num_trades["pure_forcasting"])
-            hybrid_num_trades.append(trading_strategy.num_trades["hybrid_trend"])
-            ensamble_num_trades.append(trading_strategy.num_trades["ensamble"])
-        # trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.FRAC_KELLY, trade_thresold)
-        # trading_strategy.simulate_trading_with_strategies(true_values, predicted_values)
+            ensemble_with_llm_trend_num_trades.append(trading_strategy.num_trades["ensemble_with_llm_trend"])
+            ensemble_with_llm_mean_reversion_num_trades.append(trading_strategy.num_trades["ensemble_with_llm_mean_reversion"])
             
+    cumulative_mean_reversion_profit = np.cumsum(mean_reversion_profit)
     cumulative_trend_profit = np.cumsum(trend_profit)
     cumulative_forecasting_profit = np.cumsum(forecasting_profit)
-    cumulative_hybrid_profit = np.cumsum(hybrid_profit)
-    cumulative_ensamble_profit = np.cumsum(ensamble_profit)
+    cumulative_ensemble_with_llm_trend_profit = np.cumsum(ensemble_with_llm_trend_profit)
+    cumulative_ensemble_with_llm_mean_reversion_profit = np.cumsum(ensemble_with_llm_mean_reversion_profit)
 
+    cumulative_mean_reversion_profit_per_trade = [
+        np.sum(mean_reversion_profit[:i+1]) / np.sum(mean_reversion_num_trades[:i+1]) for i in range(len(mean_reversion_profit))
+    ]
     cumulative_trend_profit_per_trade = [
         np.sum(trend_profit[:i+1]) / np.sum(trend_num_trades[:i+1]) for i in range(len(trend_profit))
     ]
     cumulative_forecasting_profit_per_trade = [
         np.sum(forecasting_profit[:i+1]) / np.sum(forecasting_num_trades[:i+1]) for i in range(len(forecasting_profit))
     ]
-    cumulative_hybrid_profit_per_trade = [
-        np.sum(hybrid_profit[:i+1]) / np.sum(hybrid_num_trades[:i+1]) for i in range(len(hybrid_profit))
+    cumulative_ensemble_with_llm_trend_profit_per_trade = [
+        np.sum(ensemble_with_llm_trend_profit[:i+1]) / np.sum(ensemble_with_llm_trend_num_trades[:i+1]) for i in range(len(ensemble_with_llm_trend_profit))
     ]
-    cumulative_ensamble_profit_per_trade = [
-        np.sum(ensamble_profit[:i+1]) / np.sum(ensamble_num_trades[:i+1]) for i in range(len(ensamble_profit))
+    cumulative_ensemble_with_llm_mean_reversion_profit_per_trade = [
+        np.sum(ensemble_with_llm_mean_reversion_profit[:i+1]) / np.sum(ensemble_with_llm_mean_reversion_num_trades[:i+1]) for i in range(len(ensemble_with_llm_mean_reversion_profit))
     ]
 
+    plt.plot(cumulative_mean_reversion_profit_per_trade, color='purple', label='Cumulative Mean Reversion Profit Per Trade')
     plt.plot(cumulative_trend_profit_per_trade, color='blue', label='Cumulative Trend Profit Per Trade')
     plt.plot(cumulative_forecasting_profit_per_trade, color='red', label='Cumulative Forecasting Profit Per Trade')
-    plt.plot(cumulative_hybrid_profit_per_trade, color='green', label='Cumulative Hybrid Profit Per Trade')
-    plt.plot(cumulative_ensamble_profit_per_trade, color='orange', label='Cumulative Ensamble Profit Per Trade')
+    plt.plot(cumulative_ensemble_with_llm_trend_profit_per_trade, color='green', label='Cumulative Ensemble With LLM Trend Profit Per Trade')
+    plt.plot(cumulative_ensemble_with_llm_mean_reversion_profit_per_trade, color='orange', label='Cumulative Ensemble With LLM Mean Reversion Profit Per Trade')
     plt.title('Cumulative Trend and Forecasting Profits Per Trade Using Fixed Postion Size')
     plt.xlabel('Observation')
     plt.ylabel('Cumulative Profit Per Trade')
@@ -260,10 +318,23 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
 
     plt.clf()
 
+    plt.plot(mean_reversion_coeffs, color='purple', label='Mean Reversion Coefficient')
+    plt.plot(trend_coeffs, color='blue', label='Trend Coefficient')
+    plt.plot(forecasting_coeffs, color='red', label='Forecasting Coefficient')
+    plt.plot(llm_sentiment_coeffs, color='green', label='LLM Coefficient')
+    plt.title('Trend, Forecasting, and LLM Coefficients Using Fixed Postion Size')
+    plt.xlabel('Observation')
+    plt.ylabel('Coefficient')
+    plt.legend()
+    plt.savefig('trend_vs_forecasting_coeffs_fixed.png', dpi=300, bbox_inches='tight')
+
+    plt.clf()
+
+    plt.plot(cumulative_mean_reversion_profit, color='purple', label='Cumulative Mean Reversion Profit')
     plt.plot(cumulative_trend_profit, color='blue', label='Cumulative Trend Profit')
     plt.plot(cumulative_forecasting_profit, color='red', label='Cumulative Forecasting Profit')
-    plt.plot(cumulative_hybrid_profit, color='green', label='Cumulative Hybrid Profit')
-    plt.plot(cumulative_ensamble_profit, color='orange', label='Cumulative Ensamble Profit')
+    plt.plot(cumulative_ensemble_with_llm_trend_profit, color='green', label='Cumulative Ensemble With LLM Trend Profit')
+    plt.plot(cumulative_ensemble_with_llm_mean_reversion_profit, color='orange', label='Cumulative Ensemble With LLM Mean Reversion Profit')
     plt.title('Cumulative Trend and Forecasting Profits Using Fixed Postion Size')
     plt.xlabel('Observation')
     plt.ylabel('Cumulative Profit')
@@ -272,10 +343,11 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
 
     plt.clf()
 
+    plt.plot(mean_reversion_profit, color='purple', label='Mean Reversion Profit')
     plt.plot(trend_profit, color = 'blue', label = 'Trend Profit')
     plt.plot(forecasting_profit, color = 'red', label = 'Forcasting Profit')
-    plt.plot(hybrid_profit, color = 'green', label = 'Hybrid Profit')
-    plt.plot(ensamble_profit, color='orange', label='Ensamble Profit')
+    plt.plot(ensemble_with_llm_trend_profit, color='green', label='Ensemble With LLM Trend Profit')
+    plt.plot(ensemble_with_llm_mean_reversion_profit, color='orange', label='Ensemble With LLM Mean Reversion Profit')
     plt.title('Trend and Forcasting Profits Using Fixed Postion Size')
     plt.xlabel('Observation')
     plt.ylabel('Profit')
@@ -284,15 +356,18 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
 
     plt.clf()
 
+    plt.plot(mean_reversion_profit_per_trade, color='purple', label='Mean Reversion Profit Per Trade')
     plt.plot(trend_profit_per_trade, color = 'blue', label = 'Trend Profit Per Trade')
     plt.plot(forecasting_profit_per_trade, color = 'red', label = 'Forcasting Profit Per Trade')
-    plt.plot(hybrid_profit_per_trade, color = 'green', label = 'Hybrid Profit Per Trade')
-    plt.plot(ensamble_profit_per_trade, color='orange', label='Ensamble Profit Per Trade')
+    plt.plot(ensemble_with_llm_trend_profit_per_trade, color='green', label='Ensemble With LLM Trend Profit Per Trade')
+    plt.plot(ensemble_with_llm_mean_reversion_profit_per_trade, color='orange', label='Ensemble With LLM Mean Reversion Profit Per Trade')
     plt.title('Trend and Forcasting Profit Per Trade Using Fixed Postion Size')
     plt.xlabel('Observation')
     plt.ylabel('Profit Per Trade')
     plt.legend()
     plt.savefig('trend_vs_forcasting_profit_per_trade_fixed.png', dpi=300, bbox_inches='tight')
+
+    plt.clf()
 
 def run(args):
     """Parse command-line arguments and configure the trading model, then run the trading strategy."""
