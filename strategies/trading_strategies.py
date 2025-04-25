@@ -10,21 +10,21 @@ class TradingStrategy():
         self.frac_kelly = frac_kelly
         self.trade_threshold = trade_threshold
         # Initialize wallets for different trading strategies
-        self.wallet_a = {'mean_reversion': wallet_a, 'trend': wallet_a, 'pure_forcasting': wallet_a, 'ensemble_with_llm_mean_reversion': wallet_a, 'ensemble_with_llm_trend': wallet_a}
-        self.wallet_b = {'mean_reversion': wallet_b, 'trend': wallet_b, 'pure_forcasting': wallet_b, 'ensemble_with_llm_mean_reversion': wallet_b, 'ensemble_with_llm_trend': wallet_b}
+        self.wallet_a = {'mean_reversion': wallet_a, 'trend': wallet_a, 'pure_forecasting': wallet_a, 'ensemble_with_llm_mean_reversion': wallet_a, 'ensemble_with_llm_trend': wallet_a}
+        self.wallet_b = {'mean_reversion': wallet_b, 'trend': wallet_b, 'pure_forecasting': wallet_b, 'ensemble_with_llm_mean_reversion': wallet_b, 'ensemble_with_llm_trend': wallet_b}
         # Track profit/loss, wins/losses, and total gains/losses for each strategy
-        self.total_profit_or_loss = {'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'ensemble_with_llm_mean_reversion': 0, 'ensemble_with_llm_trend': 0}
-        self.num_trades = {'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'ensemble_with_llm_mean_reversion': 0, 'ensemble_with_llm_trend': 0}
-        self.num_wins = {'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'ensemble_with_llm_mean_reversion': 0, 'ensemble_with_llm_trend': 0}
-        self.num_losses = {'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'ensemble_with_llm_mean_reversion': 0, 'ensemble_with_llm_trend': 0}
-        self.total_gains = {'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'ensemble_with_llm_mean_reversion': 0, 'ensemble_with_llm_trend': 0}
-        self.total_losses = {'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'ensemble_with_llm_mean_reversion': 0, 'ensemble_with_llm_trend': 0}
+        self.total_profit_or_loss = {'mean_reversion': 0, 'trend': 0, 'pure_forecasting': 0, 'ensemble_with_llm_mean_reversion': 0, 'ensemble_with_llm_trend': 0}
+        self.num_trades = {'mean_reversion': 0, 'trend': 0, 'pure_forecasting': 0, 'ensemble_with_llm_mean_reversion': 0, 'ensemble_with_llm_trend': 0}
+        self.num_wins = {'mean_reversion': 0, 'trend': 0, 'pure_forecasting': 0, 'ensemble_with_llm_mean_reversion': 0, 'ensemble_with_llm_trend': 0}
+        self.num_losses = {'mean_reversion': 0, 'trend': 0, 'pure_forecasting': 0, 'ensemble_with_llm_mean_reversion': 0, 'ensemble_with_llm_trend': 0}
+        self.total_gains = {'mean_reversion': 0, 'trend': 0, 'pure_forecasting': 0, 'ensemble_with_llm_mean_reversion': 0, 'ensemble_with_llm_trend': 0}
+        self.total_losses = {'mean_reversion': 0, 'trend': 0, 'pure_forecasting': 0, 'ensemble_with_llm_mean_reversion': 0, 'ensemble_with_llm_trend': 0}
 
         # New: Track open positions
         self.open_positions = {
             'mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
             'trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
-            'pure_forcasting': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
+            'pure_forecasting': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
             'ensemble_with_llm_mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
             'ensemble_with_llm_trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0}
         }
@@ -32,7 +32,7 @@ class TradingStrategy():
         self.open_positions_signal = {
             'mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
             'trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
-            'pure_forcasting': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
+            'pure_forecasting': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
             'ensemble_with_llm_mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
             'ensemble_with_llm_trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0}
         }
@@ -228,7 +228,7 @@ class TradingStrategy():
             elif base_ratio_change < -self.trade_threshold:
                 trade_direction = 'sell_currency_a'
                 
-        elif(strategy_name == 'pure_forcasting'):
+        elif(strategy_name == 'pure_forecasting'):
             # Pure forecasting strategy: trade based on predicted future ratio changes
             if predicted_ratio_change > self.trade_threshold:
                 trade_direction = 'buy_currency_a'
@@ -243,6 +243,7 @@ class TradingStrategy():
             
         return trade_direction
     
+    '''
     def close_position_signal(self, strategy_name, curr_ratio, next_ratio):
         """Close a signal position and calculate the profit/loss"""
         position = self.open_positions_signal[strategy_name]
@@ -264,11 +265,12 @@ class TradingStrategy():
         self.open_positions_signal[strategy_name] = {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0}
         
         return profit
+    '''
 
     def get_strategy_signals(self, base_ratio_change, predicted_ratio_change, curr_ratio, next_ratio, llm_sentiment):
         """Get the signals (+1, 0, -1) for each strategy."""
         signals = {}
-        strategy_names = ['mean_reversion', 'trend', 'pure_forcasting', 'llm']
+        strategy_names = ['mean_reversion', 'trend', 'pure_forecasting', 'llm']
         for strategy_name in strategy_names:
             trade_direction = self.determine_trade_direction(strategy_name, base_ratio_change, predicted_ratio_change, llm_sentiment)
             if trade_direction == 'buy_currency_a':
@@ -337,7 +339,7 @@ class TradingStrategy():
         # Get individual trade directions
         mean_rev_dir = self.determine_trade_direction("mean_reversion", base_percentage_increase, predicted_percentage_increase, 0)
         trend_dir = self.determine_trade_direction("trend", base_percentage_increase, predicted_percentage_increase, 0)
-        forecast_dir = self.determine_trade_direction("pure_forcasting", base_percentage_increase, predicted_percentage_increase, 0)
+        forecast_dir = self.determine_trade_direction("pure_forecasting", base_percentage_increase, predicted_percentage_increase, 0)
         llm_dir = self.determine_trade_direction("llm", base_percentage_increase, predicted_percentage_increase, llm_sentiment)
         
         # Convert directions to numerical values
@@ -408,7 +410,7 @@ class TradingStrategy():
 
             signals = self.get_strategy_signals(base_percentage_increase, predicted_percentage_increase, curr_ratio, actual_next_ratio, llm_sentiment)
             trend_cumulative_profit += signals['trend']
-            forecast_cumulative_profit += signals['pure_forcasting']
+            forecast_cumulative_profit += signals['pure_forecasting']
             llm_sentiment_cumulative_profit += signals['llm']
 
             # Calculate profit using fixed position size
@@ -522,7 +524,7 @@ class TradingStrategy():
 
             signals = self.get_strategy_signals(base_percentage_increase, predicted_percentage_increase, curr_ratio, actual_next_ratio, llm_sentiment)
             mean_reversion_cumulative_profit += signals['mean_reversion']
-            forecast_cumulative_profit += signals['pure_forcasting']
+            forecast_cumulative_profit += signals['pure_forecasting']
             llm_sentiment_cumulative_profit += signals['llm']
 
             # Calculate profit using fixed position size
@@ -605,7 +607,7 @@ class TradingStrategy():
 
         '''
 
-        strategy_names = ['mean_reversion', 'trend', 'pure_forcasting']
+        strategy_names = ['mean_reversion', 'trend', 'pure_forecasting']
         
         for strategy_name in strategy_names:
             for i in range(split_idx + 2, len(actual_rates) - 1):
