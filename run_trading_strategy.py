@@ -281,11 +281,30 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
             forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forecasting"])
             ensemble_with_llm_trend_profit.append(trading_strategy.total_profit_or_loss["ensemble_with_llm_trend"])
             ensemble_with_llm_mean_reversion_profit.append(trading_strategy.total_profit_or_loss["ensemble_with_llm_mean_reversion"])
-            mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["mean_reversion"] / trading_strategy.num_trades["mean_reversion"]
-            trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["trend"] / trading_strategy.num_trades["trend"]
-            forecasting_profit_per_trade_val = trading_strategy.total_profit_or_loss["pure_forecasting"] / trading_strategy.num_trades["pure_forecasting"]
-            ensemble_with_llm_trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["ensemble_with_llm_trend"] / trading_strategy.num_trades["ensemble_with_llm_trend"]
-            ensemble_with_llm_mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["ensemble_with_llm_mean_reversion"] / trading_strategy.num_trades["ensemble_with_llm_mean_reversion"]
+            mean_reversion_profit_per_trade_val = (
+                trading_strategy.total_profit_or_loss["mean_reversion"] / trading_strategy.num_trades["mean_reversion"]
+                if trading_strategy.num_trades["mean_reversion"] > 0 else 0
+            )
+
+            trend_profit_per_trade_val = (
+                trading_strategy.total_profit_or_loss["trend"] / trading_strategy.num_trades["trend"]
+                if trading_strategy.num_trades["trend"] > 0 else 0
+            )
+
+            forecasting_profit_per_trade_val = (
+                trading_strategy.total_profit_or_loss["pure_forecasting"] / trading_strategy.num_trades["pure_forecasting"]
+                if trading_strategy.num_trades["pure_forecasting"] > 0 else 0
+            )
+
+            ensemble_with_llm_trend_profit_per_trade_val = (
+                trading_strategy.total_profit_or_loss["ensemble_with_llm_trend"] / trading_strategy.num_trades["ensemble_with_llm_trend"]
+                if trading_strategy.num_trades["ensemble_with_llm_trend"] > 0 else 0
+            )
+
+            ensemble_with_llm_mean_reversion_profit_per_trade_val = (
+                trading_strategy.total_profit_or_loss["ensemble_with_llm_mean_reversion"] / trading_strategy.num_trades["ensemble_with_llm_mean_reversion"]
+                if trading_strategy.num_trades["ensemble_with_llm_mean_reversion"] > 0 else 0
+            )
             mean_reversion_profit_per_trade.append(mean_reversion_profit_per_trade_val)
             trend_profit_per_trade.append(trend_profit_per_trade_val)
             forecasting_profit_per_trade.append(forecasting_profit_per_trade_val)
