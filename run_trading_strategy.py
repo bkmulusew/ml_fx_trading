@@ -10,8 +10,23 @@ from strategies import TradingStrategy
 from collections import defaultdict
 from datetime import datetime
 import pandas as pd
+import os
 
-def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
+def train_or_load_model(model_name, dataProcessor, model_config, dataset_path):
+    predictor = DartsFinancialForecastingModel(model_name, dataProcessor, model_config)
+    save_path = "JanCurrLLM_trained_tcn_predictor.pkl" if dataset_path == "dataset/JanCurrLLM" else "2023_trained_tcn_predictor.pkl"
+    if os.path.exists(save_path):
+        print("Loading saved model...")
+        predictor.model = predictor.model.load(save_path)
+    else:
+        print("Training new model...")
+        train_series, valid_series, test_series, test_dates, test_bid_prices, test_ask_prices, test_with_prompt, test_without_prompt = predictor.split_and_scale_data()
+        predictor.train(train_series, valid_series)
+        predictor.model.save(save_path)
+    
+    return predictor
+
+def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds, dataset_path):
     """Run a trading strategy based on a supervised learning model, including model training, prediction,
     and evaluation of trading performance."""
     eval_metrics = ModelEvaluationMetrics()
@@ -28,7 +43,9 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
         predicted_values = generated_values['predicted_values']
         true_values = generated_values['true_values']
     else:
-        predictor = DartsFinancialForecastingModel(model_name, dataProcessor, model_config)
+        predictor = train_or_load_model(model_name, dataProcessor, model_config, dataset_path)
+
+        # Generate predictions
         train_series, valid_series, test_series, test_dates, test_bid_prices, test_ask_prices, test_with_prompt, test_without_prompt = predictor.split_and_scale_data()
         predictor.train(train_series, valid_series)
         predicted_values = predictor.generate_predictions(test_series)
@@ -37,6 +54,8 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     # Plot the actual and predicted values using matplotlib to visualize the model's performance.
     plt.plot(true_values, color = 'blue', label = 'True')
     plt.plot(predicted_values, color = 'red', label = 'Prediction')
+    plt.plot(test_bid_prices, color = 'green', label = 'Bid')
+    plt.plot(test_ask_prices, color = 'orange', label = 'Ask')
     plt.title('True and Predicted Values (Model: ' + model_name + ' )')
     plt.xlabel('Observations')
     plt.ylabel('Ratio')
@@ -45,6 +64,59 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     plt.savefig('true_vs_pridicted_' + model_name + '.png', dpi=300, bbox_inches='tight')
 
     plt.clf()
+
+    df = pd.DataFrame({
+        'bid': test_bid_prices,
+        'mid' : true_values,
+        'ask': test_ask_prices
+    }, index=test_dates)
+
+    df['r_bid'] = df['bid'].pct_change()
+    df['r_ask'] = df['ask'].pct_change()
+    df['r_mid'] = df['mid'].pct_change()
+    df['spread'] = df['ask'] - df['bid']
+
+    window = 180
+
+    # rolling standard deviation of returns:
+    df['vol_bid'] = df['r_bid'].rolling(window).std()
+    df['vol_ask'] = df['r_ask'].rolling(window).std()
+    df['vol_mid'] = df['r_mid'].rolling(window).std()
+
+    # --- 3) drop NaNs and prep for plotting/correlation ---
+    plot_df = df[['vol_mid','spread']].dropna()
+
+    # --- 4) scatter plot ---
+    plt.figure(figsize=(8,6))
+    plt.scatter(
+        plot_df['vol_mid'],
+        plot_df['spread'],
+        alpha=0.5,
+        s=15
+    )
+    plt.xlabel('180-Min Rolling Volatility (mid returns)')
+    plt.ylabel('Bid–Ask Spread')
+    plt.title('Spread vs. 180-Min Volatility')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+    plt.savefig(f'true_vs_predicted_180 volatility vs spread' + model_name + '.png', dpi=300, bbox_inches='tight')
+    plt.clf()
+
+    # --- 5) compute Pearson r and bootstrap CI ---
+    r = plot_df['vol_mid'].corr(plot_df['spread'])
+    n_boot = 1000
+    boot_corrs = []
+    for _ in range(n_boot):
+        samp = plot_df.sample(frac=1, replace=True)
+        boot_corrs.append(samp['vol_mid'].corr(samp['spread']))
+    ci_lower, ci_upper = np.percentile(boot_corrs, [2.5, 97.5])
+
+    print(f"Pearson r = {r:.3f}")
+    print(f"95% bootstrap CI = [{ci_lower:.3f}, {ci_upper:.3f}]")
+
+    
+    
 
     # Calculate and print the prediction error using the actual and predicted values.
     prediction_error = eval_metrics.calculate_prediction_error(predicted_values, true_values)
@@ -109,14 +181,34 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
             trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["with_prompt"])
             mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
             trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
-            forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])
+            forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forecasting"])
             ensemble_with_llm_trend_profit.append(trading_strategy.total_profit_or_loss["ensemble_with_llm_trend"])
             ensemble_with_llm_mean_reversion_profit.append(trading_strategy.total_profit_or_loss["ensemble_with_llm_mean_reversion"])
-            mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["mean_reversion"] / trading_strategy.num_trades["mean_reversion"]
-            trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["trend"] / trading_strategy.num_trades["trend"]
-            forecasting_profit_per_trade_val = trading_strategy.total_profit_or_loss["pure_forcasting"] / trading_strategy.num_trades["pure_forcasting"]
-            ensemble_with_llm_trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["ensemble_with_llm_trend"] / trading_strategy.num_trades["ensemble_with_llm_trend"]
-            ensemble_with_llm_mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["ensemble_with_llm_mean_reversion"] / trading_strategy.num_trades["ensemble_with_llm_mean_reversion"]
+            mean_reversion_profit_per_trade_val = (
+                trading_strategy.total_profit_or_loss["mean_reversion"] / trading_strategy.num_trades["mean_reversion"]
+                if trading_strategy.num_trades["mean_reversion"] > 0 else 0
+            )
+
+            trend_profit_per_trade_val = (
+                trading_strategy.total_profit_or_loss["trend"] / trading_strategy.num_trades["trend"]
+                if trading_strategy.num_trades["trend"] > 0 else 0
+            )
+
+            forecasting_profit_per_trade_val = (
+                trading_strategy.total_profit_or_loss["pure_forecasting"] / trading_strategy.num_trades["pure_forecasting"]
+                if trading_strategy.num_trades["pure_forecasting"] > 0 else 0
+            )
+
+            ensemble_with_llm_trend_profit_per_trade_val = (
+                trading_strategy.total_profit_or_loss["ensemble_with_llm_trend"] / trading_strategy.num_trades["ensemble_with_llm_trend"]
+                if trading_strategy.num_trades["ensemble_with_llm_trend"] > 0 else 0
+            )
+
+            ensemble_with_llm_mean_reversion_profit_per_trade_val = (
+                trading_strategy.total_profit_or_loss["ensemble_with_llm_mean_reversion"] / trading_strategy.num_trades["ensemble_with_llm_mean_reversion"]
+                if trading_strategy.num_trades["ensemble_with_llm_mean_reversion"] > 0 else 0
+            )
+
             mean_reversion_profit_per_trade.append(mean_reversion_profit_per_trade_val)
             trend_profit_per_trade.append(trend_profit_per_trade_val)
             forecasting_profit_per_trade.append(forecasting_profit_per_trade_val)
@@ -130,7 +222,7 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
 
             mean_reversion_num_trades.append(trading_strategy.num_trades["mean_reversion"])
             trend_num_trades.append(trading_strategy.num_trades["trend"])
-            forecasting_num_trades.append(trading_strategy.num_trades["pure_forcasting"])
+            forecasting_num_trades.append(trading_strategy.num_trades["pure_forecasting"])
             ensemble_with_llm_trend_num_trades.append(trading_strategy.num_trades["ensemble_with_llm_trend"])
             ensemble_with_llm_mean_reversion_num_trades.append(trading_strategy.num_trades["ensemble_with_llm_mean_reversion"])
             
@@ -203,7 +295,7 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     plt.xlabel('Observation')
     plt.ylabel('Profit')
     plt.legend()
-    plt.savefig('trend_vs_forcasting_profits_kelly.png', dpi=300, bbox_inches='tight')
+    plt.savefig('trend_vs_forecasting_profits_kelly.png', dpi=300, bbox_inches='tight')
 
     plt.clf()
 
@@ -216,7 +308,7 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     plt.xlabel('Observation')
     plt.ylabel('Profit Per Trade')
     plt.legend()
-    plt.savefig('trend_vs_forcasting_profit_per_trade_kelly.png', dpi=300, bbox_inches='tight')
+    plt.savefig('trend_vs_forecasting_profit_per_trade_kelly.png', dpi=300, bbox_inches='tight')
 
     plt.clf()
 
@@ -258,14 +350,33 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
             trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["with_prompt"], use_kelly=False)
             mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
             trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
-            forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])
+            forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forecasting"])
             ensemble_with_llm_trend_profit.append(trading_strategy.total_profit_or_loss["ensemble_with_llm_trend"])
             ensemble_with_llm_mean_reversion_profit.append(trading_strategy.total_profit_or_loss["ensemble_with_llm_mean_reversion"])
-            mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["mean_reversion"] / trading_strategy.num_trades["mean_reversion"]
-            trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["trend"] / trading_strategy.num_trades["trend"]
-            forecasting_profit_per_trade_val = trading_strategy.total_profit_or_loss["pure_forcasting"] / trading_strategy.num_trades["pure_forcasting"]
-            ensemble_with_llm_trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["ensemble_with_llm_trend"] / trading_strategy.num_trades["ensemble_with_llm_trend"]
-            ensemble_with_llm_mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["ensemble_with_llm_mean_reversion"] / trading_strategy.num_trades["ensemble_with_llm_mean_reversion"]
+            mean_reversion_profit_per_trade_val = (
+                trading_strategy.total_profit_or_loss["mean_reversion"] / trading_strategy.num_trades["mean_reversion"]
+                if trading_strategy.num_trades["mean_reversion"] > 0 else 0
+            )
+
+            trend_profit_per_trade_val = (
+                trading_strategy.total_profit_or_loss["trend"] / trading_strategy.num_trades["trend"]
+                if trading_strategy.num_trades["trend"] > 0 else 0
+            )
+
+            forecasting_profit_per_trade_val = (
+                trading_strategy.total_profit_or_loss["pure_forecasting"] / trading_strategy.num_trades["pure_forecasting"]
+                if trading_strategy.num_trades["pure_forecasting"] > 0 else 0
+            )
+
+            ensemble_with_llm_trend_profit_per_trade_val = (
+                trading_strategy.total_profit_or_loss["ensemble_with_llm_trend"] / trading_strategy.num_trades["ensemble_with_llm_trend"]
+                if trading_strategy.num_trades["ensemble_with_llm_trend"] > 0 else 0
+            )
+
+            ensemble_with_llm_mean_reversion_profit_per_trade_val = (
+                trading_strategy.total_profit_or_loss["ensemble_with_llm_mean_reversion"] / trading_strategy.num_trades["ensemble_with_llm_mean_reversion"]
+                if trading_strategy.num_trades["ensemble_with_llm_mean_reversion"] > 0 else 0
+            )
             mean_reversion_profit_per_trade.append(mean_reversion_profit_per_trade_val)
             trend_profit_per_trade.append(trend_profit_per_trade_val)
             forecasting_profit_per_trade.append(forecasting_profit_per_trade_val)
@@ -279,7 +390,7 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
 
             mean_reversion_num_trades.append(trading_strategy.num_trades["mean_reversion"])
             trend_num_trades.append(trading_strategy.num_trades["trend"])
-            forecasting_num_trades.append(trading_strategy.num_trades["pure_forcasting"])
+            forecasting_num_trades.append(trading_strategy.num_trades["pure_forecasting"])
             ensemble_with_llm_trend_num_trades.append(trading_strategy.num_trades["ensemble_with_llm_trend"])
             ensemble_with_llm_mean_reversion_num_trades.append(trading_strategy.num_trades["ensemble_with_llm_mean_reversion"])
             
@@ -352,7 +463,7 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     plt.xlabel('Observation')
     plt.ylabel('Profit')
     plt.legend()
-    plt.savefig('trend_vs_forcasting_profits_fixed.png', dpi=300, bbox_inches='tight')
+    plt.savefig('trend_vs_forecasting_profits_fixed.png', dpi=300, bbox_inches='tight')
 
     plt.clf()
 
@@ -365,7 +476,7 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     plt.xlabel('Observation')
     plt.ylabel('Profit Per Trade')
     plt.legend()
-    plt.savefig('trend_vs_forcasting_profit_per_trade_fixed.png', dpi=300, bbox_inches='tight')
+    plt.savefig('trend_vs_forecasting_profit_per_trade_fixed.png', dpi=300, bbox_inches='tight')
 
     plt.clf()
 
@@ -386,7 +497,7 @@ def run(args):
     trade_thresholds = [float(threshold) for threshold in args.trade_thresholds.split(',')]
 
     # Run the trading strategy based on the specified model and configuration.
-    run_sl_based_trading_strategy(model_name, model_config, trade_thresholds)
+    run_sl_based_trading_strategy(model_name, model_config, trade_thresholds, args.data_path)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
