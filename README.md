@@ -20,22 +20,24 @@ This project implements a financial trading strategy that combines machine learn
 
 ## Dataset
 Before training or evaluating the model and running the trading simulation with different pairs trading strategies, it is necessary to have a dataset. The dataset should be in the following format:
-| Time	                  | A_to_B |
-| :---                    | :---:  |
-| 2023 01 03 10 09 00.000	| 0.21	 |
-| 2023 01 03 10 10 00.000	| 0.22	 |
-| 2023 01 03 10 11 00.000	| 0.23	 |
-| 2023 01 03 10 12 00.000	| 0.24	 |
-| 2023 01 03 10 13 00.000	| 0.25	 |
-| 2023 01 03 10 14 00.000	| 0.26	 |
+| Date	            | Bid | Ask | Mid | With Prompt | Without Prompt |
+| :---                  | :---:  | :---:  | :---:  | :---:  | :---:  |
+| 2/3/2023 16:56	| 6.8004     | 6.8004     | 6.8004     | 0            | 1     |
+| 2/3/2023 16:57	| 6.8038	 | 6.8038	  | 6.8038	   | 0            | 0     |
+| 2/3/2023 16:58	| 6.8036	 | 6.8036	  | 6.8036	   | 1            | 0     |
+| 2/3/2023 16:59	| 6.805	 | 6.805	  | 6.805	   | 0            | 0	  |
 
 In this dataset:
-- Time represents the timestamp of each data point.
-- A_to_B represents the exchange rate from Currency A to Currency B.
+- 'Date' represents the timestamp of each data point.
+- 'Bid' represents the bid price from Currency A to Currency B.
+- 'Ask' represents the ask price from Currency A to Currency B.
+- 'Mid' represents the mid price (average of bid and ask prices) from Currency A to Currency B.
+- 'With Prompt' represents the LLM's prediction for Currency A direction after being given an article with prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
+- 'Without Prompt' represents the LLM's prediction for Currency A direction after being given an article without prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
 
 ## Example Usage
 ```bash
-python run_trading_strategy.py --model tcn --data_path /path/to/data --n_epochs 50
+python ml_fx_trading/run_trading_strategy.py --model tcn --data_path /path/to/data --n_epochs 50
 ```
 
 The full list of flags and options for the python script is as follows:
@@ -52,4 +54,5 @@ The full list of flags and options for the python script is as follows:
 --thresholds: Specify a list of threshold values for trading. Provide the values as a comma-separated list of size 4.
             For example, use '--threshold 0,0.00025,0.0005,0.001' to set thresholds at 0, 0.00025, 0.0005, and 0.001.
 --frac_kelly: Enable fractional kelly to size bets.
+--enable_transaction_costs: Enable transaction costs.
 ```
