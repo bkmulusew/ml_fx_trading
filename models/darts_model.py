@@ -99,38 +99,53 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
 
     def split_and_scale_data(self, train_ratio=0.5, validation_ratio=0.1):
         """Splits the data into training, validation, and test sets and applies scaling."""
-        dates, bid_prices, ask_prices, mid_price, with_prompt, without_prompt = self.data_processor.get_ratio_time_series()
+        dates, bid_prices, ask_prices, mid_price, with_prompt_values, without_prompt_values = self.data_processor.extract_price_time_series()
 
+        # Calculate indices for splitting
         num_observations = len(mid_price)
         train_end_index = int(num_observations * train_ratio)
         validation_end_index = int(num_observations * (train_ratio + validation_ratio))
 
-        train_series = mid_price[:train_end_index]
-        val_series = mid_price[train_end_index:validation_end_index]
-        test_series = mid_price[validation_end_index:]
+        # Split mid price series into train/validation/test
+        train_series, val_series, test_series = self._split_mid_price_series(mid_price, train_end_index, validation_end_index)
+
+        # Scale the series data
+        scaled_series = self._scale_series_data(train_series, val_series, test_series)
         
-        test_dates = dates[validation_end_index:]
-        test_dates = test_dates[self.model_config.INPUT_CHUNK_LENGTH:]
+        # Process test data
+        test_data = self._process_test_data(
+            dates=dates[validation_end_index:],
+            bid_prices=bid_prices[validation_end_index:],
+            ask_prices=ask_prices[validation_end_index:],
+            without_prompt=without_prompt_values[validation_end_index:],
+            with_prompt=with_prompt_values[validation_end_index:]
+        )
 
-        test_bid_prices = bid_prices[validation_end_index:]
-        test_bid_prices = test_bid_prices[self.model_config.INPUT_CHUNK_LENGTH:]
-
-        test_ask_prices = ask_prices[validation_end_index:]
-        test_ask_prices = test_ask_prices[self.model_config.INPUT_CHUNK_LENGTH:]
-
-        test_without_prompt = without_prompt[validation_end_index:]
-        test_without_prompt = test_without_prompt[self.model_config.INPUT_CHUNK_LENGTH:]
-
-        test_with_prompt = with_prompt[validation_end_index:]
-        test_with_prompt = test_with_prompt[self.model_config.INPUT_CHUNK_LENGTH:]
-
-        # Scaling the data
+        return (*scaled_series, *test_data)
+    
+    def _split_mid_price_series(self, mid_price, train_end, validation_end):
+        """Split the mid price series into train, validation, and test sets."""
+        return (
+            mid_price[:train_end],
+            mid_price[train_end:validation_end],
+            mid_price[validation_end:]
+        )
+    
+    def _process_test_data(self, **test_series):
+        """Process all test data series by applying the input chunk length offset."""
+        return [
+            series[self.model_config.INPUT_CHUNK_LENGTH:]
+            for series in test_series.values()
+        ]
+    
+    def _scale_series_data(self, train_series, val_series, test_series):
+        """Scale the series data using the Scaler."""
         self.scaler = Scaler()
-        train_series_scaled = self.scaler.fit_transform(train_series)
-        valid_series_scaled = self.scaler.transform(val_series)
-        test_series_scaled = self.scaler.transform(test_series)
-
-        return train_series_scaled, valid_series_scaled, test_series_scaled, test_dates, test_bid_prices, test_ask_prices, test_with_prompt, test_without_prompt
+        return (
+            self.scaler.fit_transform(train_series),
+            self.scaler.transform(val_series),
+            self.scaler.transform(test_series)
+        )
 
     def train(self, train_series, validation_series):
         """Trains the model."""
