@@ -12,7 +12,7 @@ class TradingStrategy():
         self.wallet_b = {'mean_reversion': wallet_b, 'pure_forcasting': wallet_b, 'ensemble_with_llm_mean_reversion': wallet_b}
         # Track profit/loss, wins/losses, and total gains/losses for each strategy
         self.total_profit_or_loss = {'mean_reversion': 0, 'pure_forcasting': 0, 'ensemble_with_llm_mean_reversion': 0}
-        self.num_trades = {'mean_reversion': 0, 'pure_forcasting': 0, 'ensemble_with_llm_mean_reversion': 0}
+        self.num_trades = {'mean_reversion': 1, 'pure_forcasting': 1, 'ensemble_with_llm_mean_reversion': 1}
         self.num_wins = {'mean_reversion': 0, 'pure_forcasting': 0, 'ensemble_with_llm_mean_reversion': 0}
         self.num_losses = {'mean_reversion': 0, 'pure_forcasting': 0, 'ensemble_with_llm_mean_reversion': 0}
         self.total_gains = {'mean_reversion': 0, 'pure_forcasting': 0, 'ensemble_with_llm_mean_reversion': 0}
@@ -501,8 +501,8 @@ class TradingStrategy():
                 self.num_losses[strategy_name] += 1
                 self.total_losses[strategy_name] += abs(profit)
 
-        if(self.num_trades[strategy_name] == 0):
-            self.num_trades[strategy_name] = 1
+        # if(self.num_trades[strategy_name] == 0):
+        #     self.num_trades[strategy_name] = 1
 
         # Close any remaining open positions for all strategies
         if self.open_positions[strategy_name]['type'] is not None:

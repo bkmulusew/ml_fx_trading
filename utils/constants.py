@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 @dataclass
 class ModelConfig:
-    INPUT_CHUNK_LENGTH: int = 50
+    INPUT_CHUNK_LENGTH: int = 64
     OUTPUT_CHUNK_LENGTH: int = 1
     N_EPOCHS: int = 3
     BATCH_SIZE: int = 1024
