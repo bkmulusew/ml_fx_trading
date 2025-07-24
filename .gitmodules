@@ -1,0 +1,3 @@
+[submodule "models/toto"]
+	path = models/toto
+	url = https://github.com/DataDog/toto.git

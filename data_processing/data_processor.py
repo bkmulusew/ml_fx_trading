@@ -1,6 +1,7 @@
 import pandas as pd
 from darts import TimeSeries
 
+
 class DataProcessor:
     def __init__(self, model_config):
         self.model_config = model_config
@@ -14,9 +15,9 @@ class DataProcessor:
 
     def extract_price_time_series(self):
         """Extracts price related data from the DataFrame."""
-        
+
         df = self.load_and_prepare_data()
-    
+
         # Define column names for clarity
         columns = {
             'date': df.columns[0],
@@ -26,16 +27,17 @@ class DataProcessor:
             'without_prompt': df.columns[4],
             'with_prompt': df.columns[5]
         }
-        
+
         # Extract data into respective lists
         dates = df[columns['date']].tolist()
         bid_prices = df[columns['bid']].tolist()
         ask_prices = df[columns['ask']].tolist()
         with_prompt_values = df[columns['with_prompt']].tolist()
         without_prompt_values = df[columns['without_prompt']].tolist()
-        
+
         # Create time series from mid prices
-        mid_price_series = TimeSeries.from_dataframe(df, value_cols=[columns['mid']])
+        # mid_price_series = TimeSeries.from_dataframe(df, value_cols=[columns['mid']])
+        mid_price_series = df[columns['mid']].values
 
         return (
             dates,
