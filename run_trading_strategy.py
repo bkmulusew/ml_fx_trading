@@ -81,9 +81,11 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
 
     plot_prediction_comparison(true_values, predicted_values, model_name)
 
+    parsed_test_dates = [datetime.strptime(date, "%m/%d/%Y %H:%M") for date in test_dates]
+
     # Group data by date for trading simulation
     chunked_values = group_data_by_date(
-        test_dates, 
+        parsed_test_dates, 
         true_values, 
         predicted_values,
         test_bid_prices, 

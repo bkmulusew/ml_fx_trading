@@ -9,7 +9,7 @@ class DataProcessor:
     def load_and_prepare_data(self):
         """Loads the CSV file and calculates the ratio if not already done."""
         if self.data_df is None:
-            self.data_df = pd.read_excel(self.model_config.DATA_FILE_PATH)
+            self.data_df = pd.read_csv(self.model_config.DATA_FILE_PATH)
         return self.data_df
 
     def extract_price_time_series(self):
@@ -34,7 +34,6 @@ class DataProcessor:
         with_prompt_values = df[columns['with_prompt']].tolist()
         without_prompt_values = df[columns['without_prompt']].tolist()
         
-        # Create time series from mid prices
         mid_price_series = TimeSeries.from_dataframe(df, value_cols=[columns['mid']])
 
         return (
