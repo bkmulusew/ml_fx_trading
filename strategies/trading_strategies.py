@@ -301,7 +301,7 @@ class TradingStrategy():
             # print("XGBoost model trained. Feature importances:", feature_importance)
             return feature_importance
         else:
-            # print("Not enough data to train XGBoost model.")
+            print("Not enough data to train XGBoost model.")
             return None
 
     def display_total_profit(self):

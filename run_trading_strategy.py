@@ -124,6 +124,9 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
         print(f"Trade Threshold: {trade_thresold}")
         # Print the results
         for date_key, values in chunked_values.items():
+            if (len(values['true_values']) < 7):
+                continue
+
             trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.FRAC_KELLY, trade_thresold)
             trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["with_prompt"], enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS)
             mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
@@ -163,7 +166,7 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     ]
 
     plt.plot(cumulative_mean_reversion_profit_per_trade, color='purple', label='Cumulative Mean Reversion Profit Per Trade')
-    plt.plot(cumulative_forecasting_profit_per_trade, color='red', label='Cumulative Forecasting Profit Per Trade TCN')
+    plt.plot(cumulative_forecasting_profit_per_trade, color='red', label='Cumulative Forecasting Profit Per Trade {model_name}')
     plt.plot(cumulative_ensemble_with_llm_mean_reversion_profit_per_trade, color='orange', label='Cumulative Ensemble With LLM Mean Reversion Profit Per Trade')
     plt.title('Cumulative Profits Per Trade Using Kelly')
     plt.xlabel('Observation')
@@ -185,7 +188,7 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     plt.clf()
 
     plt.plot(cumulative_mean_reversion_profit, color='purple', label='Cumulative Mean Reversion Profit')
-    plt.plot(cumulative_forecasting_profit, color='red', label='Cumulative Forecasting Profit TCN')
+    plt.plot(cumulative_forecasting_profit, color='red', label='Cumulative Forecasting Profit {model_name}')
     plt.plot(cumulative_ensemble_with_llm_mean_reversion_profit, color='orange', label='Cumulative Ensemble With LLM Mean Reversion Profit')
     plt.title('Cumulative Profits Using Kelly')
     plt.xlabel('Observation')
@@ -196,7 +199,7 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     plt.clf()
 
     plt.plot(mean_reversion_profit, color='purple', label='Mean Reversion Profit')
-    plt.plot(forecasting_profit, color = 'red', label = 'Forcasting Profit TCN')
+    plt.plot(forecasting_profit, color = 'red', label = 'Forcasting Profit {model_name}')
     plt.plot(ensemble_with_llm_mean_reversion_profit, color='orange', label='Ensemble With LLM Mean Reversion Profit')
     plt.title('Profits Using Kelly')
     plt.xlabel('Observation')
@@ -207,7 +210,7 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     plt.clf()
 
     plt.plot(mean_reversion_profit_per_trade, color='purple', label='Mean Reversion Profit Per Trade')
-    plt.plot(forecasting_profit_per_trade, color = 'red', label = 'Forcasting Profit Per Trade TCN')
+    plt.plot(forecasting_profit_per_trade, color = 'red', label = 'Forcasting Profit Per Trade {model_name}')
     plt.plot(ensemble_with_llm_mean_reversion_profit_per_trade, color='orange', label='Ensemble With LLM Mean Reversion Profit Per Trade')
     plt.title('Profit Per Trade Using Kelly')
     plt.xlabel('Observation')
@@ -218,7 +221,7 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     plt.clf()
 
     plt.plot(mean_reversion_sharpe_ratios, color='purple', label='Mean Reversion Sharpe Ratio')
-    plt.plot(forecasting_sharpe_ratios, color='red', label='Forecasting Sharpe Ratio TCN')
+    plt.plot(forecasting_sharpe_ratios, color='red', label='Forecasting Sharpe Ratio {model_name}')
     plt.plot(ensemble_with_llm_mean_reversion_sharpe_ratios, color='orange', label='Ensemble With LLM Mean Reversion Sharpe Ratio')
     plt.title('Sharpe Ratios Using Kelly')
     plt.xlabel('Observation')
@@ -259,6 +262,9 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
         print(f"Trade Threshold: {trade_thresold}")
         # Print the results
         for date_key, values in chunked_values.items():
+            if (len(values['true_values']) < 7):
+                continue
+
             trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.FRAC_KELLY, trade_thresold)
             trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["with_prompt"], use_kelly=False, enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS)
             mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
@@ -300,7 +306,7 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
 
 
     plt.plot(cumulative_mean_reversion_profit_per_trade, color='purple', label='Cumulative Mean Reversion Profit Per Trade')
-    plt.plot(cumulative_forecasting_profit_per_trade, color='red', label='Cumulative Forecasting Profit Per Trade TCN')
+    plt.plot(cumulative_forecasting_profit_per_trade, color='red', label='Cumulative Forecasting Profit Per Trade {model_name}')
     plt.plot(cumulative_ensemble_with_llm_mean_reversion_profit_per_trade, color='orange', label='Cumulative Ensemble With LLM Mean Reversion Profit Per Trade')
     plt.title('Cumulative Profits Per Trade Using Fixed Postion Size')
     plt.xlabel('Observation')
@@ -322,7 +328,7 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     plt.clf()
 
     plt.plot(cumulative_mean_reversion_profit, color='purple', label='Cumulative Mean Reversion Profit')
-    plt.plot(cumulative_forecasting_profit, color='red', label='Cumulative Forecasting Profit TCN')
+    plt.plot(cumulative_forecasting_profit, color='red', label='Cumulative Forecasting Profit {model_name}')
     plt.plot(cumulative_ensemble_with_llm_mean_reversion_profit, color='orange', label='Cumulative Ensemble With LLM Mean Reversion Profit')
     plt.title('Cumulative Profits Using Fixed Postion Size')
     plt.xlabel('Observation')
@@ -333,7 +339,7 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     plt.clf()
 
     plt.plot(mean_reversion_profit, color='purple', label='Mean Reversion Profit')
-    plt.plot(forecasting_profit, color = 'red', label = 'Forcasting Profit TCN')
+    plt.plot(forecasting_profit, color = 'red', label = 'Forcasting Profit {model_name}')
     plt.plot(ensemble_with_llm_mean_reversion_profit, color='orange', label='Ensemble With LLM Mean Reversion Profit')
     plt.title('Profits Using Fixed Postion Size')
     plt.xlabel('Observation')
@@ -344,7 +350,7 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     plt.clf()
 
     plt.plot(mean_reversion_profit_per_trade, color='purple', label='Mean Reversion Profit Per Trade')
-    plt.plot(forecasting_profit_per_trade, color = 'red', label = 'Forcasting Profit Per Trade TCN')
+    plt.plot(forecasting_profit_per_trade, color = 'red', label = 'Forcasting Profit Per Trade {model_name}')
     plt.plot(ensemble_with_llm_mean_reversion_profit_per_trade, color='orange', label='Ensemble With LLM Mean Reversion Profit Per Trade')
     plt.title('Profit Per Trade Using Fixed Postion Size')
     plt.xlabel('Observation')
@@ -355,7 +361,7 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
     plt.clf()
 
     plt.plot(mean_reversion_sharpe_ratios, color='purple', label='Mean Reversion Sharpe Ratio')
-    plt.plot(forecasting_sharpe_ratios, color='red', label='Forecasting Sharpe Ratio TCN')
+    plt.plot(forecasting_sharpe_ratios, color='red', label='Forecasting Sharpe Ratio {model_name}')
     plt.plot(ensemble_with_llm_mean_reversion_sharpe_ratios, color='orange', label='Ensemble With LLM Mean Reversion Sharpe Ratio')
     plt.title('Sharpe Ratios Using Fixed Postion Size')
     plt.xlabel('Observation')
