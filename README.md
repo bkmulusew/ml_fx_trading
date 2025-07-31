@@ -51,8 +51,6 @@ The full list of flags and options for the python script is as follows:
 --batch_size: Batch size for training.
 --train_ratio: Ratio of training data used in the train/test split. 1% of the data is used for validation.
 --data_path: Path to the dataset.
---thresholds: Specify a list of threshold values for trading. Provide the values as a comma-separated list of size 4.
-            For example, use '--threshold 0,0.00025,0.0005,0.001' to set thresholds at 0, 0.00025, 0.0005, and 0.001.
 --frac_kelly: Enable fractional kelly to size bets.
 --enable_transaction_costs: Enable transaction costs.
 ```
