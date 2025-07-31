@@ -37,7 +37,7 @@ In this dataset:
 
 ## Example Usage
 ```bash
-python ml_fx_trading/run_trading_strategy.py --model tcn --data_path /path/to/data --n_epochs 50
+python ml_fx_trading/run_trading_strategy.py --model tcn --data_path /path/to/data --n_epochs 50 --output_dir results/without_trx_cost --use_frac_kelly
 ```
 
 The full list of flags and options for the python script is as follows:
@@ -51,6 +51,8 @@ The full list of flags and options for the python script is as follows:
 --batch_size: Batch size for training.
 --train_ratio: Ratio of training data used in the train/test split. 1% of the data is used for validation.
 --data_path: Path to the dataset.
---frac_kelly: Enable fractional kelly to size bets.
+--use_frac_kelly: Enable fractional kelly to size bets.
 --enable_transaction_costs: Enable transaction costs.
+--hold_position: Enable holding position.
+--output_dir: Directory to save all outputs.
 ```
