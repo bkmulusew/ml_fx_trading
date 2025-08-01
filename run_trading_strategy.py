@@ -1,6 +1,6 @@
 from utils import ModelConfig
 from data_processing import DataProcessor
-from models import DartsFinancialForecastingModel, PytorchFinancialForecastingModel
+from models import DartsFinancialForecastingModel, PytorchFinancialForecastingModel, TotoFinancialForecastingModel
 from metrics import ModelEvaluationMetrics
 from matplotlib import pyplot as plt
 import numpy as np
@@ -67,6 +67,17 @@ def run_sl_based_trading_strategy(model_name, model_config):
         generated_values = predictor.generate_predictions(processed_data['x_test'], processed_data['y_test'])
         predicted_values = generated_values['predicted_values']
         true_values = generated_values['true_values']
+    elif model_name == 'toto':
+        predictor = TotoFinancialForecastingModel(dataProcessor, model_config)
+        generated_values = predictor.generate_predictions()
+        predicted_values = generated_values['predicted_values']
+        true_values = generated_values['true_values']
+
+        test_dates = generated_values.get('test_dates', [])
+        test_bid_prices = generated_values.get('test_bid_prices', [])
+        test_ask_prices = generated_values.get('test_ask_prices', [])
+        test_with_prompt = generated_values.get('test_with_prompt', [])
+        test_without_prompt = generated_values.get('test_without_prompt', [])
     else:
         predictor = DartsFinancialForecastingModel(model_name, dataProcessor, model_config)
         train_series, valid_series, test_series, test_dates, test_bid_prices, test_ask_prices, test_with_prompt, test_without_prompt = predictor.split_and_scale_data()
