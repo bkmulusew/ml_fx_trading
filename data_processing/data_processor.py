@@ -34,7 +34,8 @@ class DataProcessor:
         with_prompt_values = df[columns['with_prompt']].tolist()
         without_prompt_values = df[columns['without_prompt']].tolist()
         
-        mid_price_series = TimeSeries.from_dataframe(df, value_cols=[columns['mid']])
+        # mid_price_series = TimeSeries.from_dataframe(df, value_cols=[columns['mid']])
+        mid_price_series = df[columns['mid']].values
 
         return (
             dates,
