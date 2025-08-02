@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 class FinancialForecastingModel(ABC):
 
     @abstractmethod
-    def initalize_model(self):
+    def initialize_model(self):
         pass
 
     @abstractmethod

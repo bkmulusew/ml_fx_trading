@@ -10,9 +10,9 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
         self.data_processor = data_processor
         self.scaler = None
         self.model_config = model_config
-        self.model = self.initalize_model(model_name)
+        self.model = self.initialize_model(model_name)
 
-    def initalize_model(self, model_name):
+    def initialize_model(self, model_name):
         """Creates the model."""
         if model_name == "nbeats":
             return NBEATSModel(
