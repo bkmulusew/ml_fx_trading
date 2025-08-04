@@ -11,4 +11,4 @@ class ModelConfig:
     WALLET_A: float = 10000.0
     WALLET_B: float = 10000.0
     FRAC_KELLY: bool = True
-    ENABLE_TRANSACTION_COSTS: bool = False
+    ENABLE_TRANSACTION_COSTS: bool = True

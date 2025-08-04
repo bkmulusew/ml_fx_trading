@@ -1,6 +1,6 @@
 from utils import ModelConfig
 from data_processing import DataProcessor
-from models import DartsFinancialForecastingModel, PytorchFinancialForecastingModel
+from models import DartsFinancialForecastingModel, ChronosFinancialForecastingModel
 from metrics import ModelEvaluationMetrics
 from matplotlib import pyplot as plt
 import numpy as np
@@ -66,6 +66,13 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
         generated_values = predictor.generate_predictions(processed_data['x_test'], processed_data['y_test'])
         predicted_values = generated_values['predicted_values']
         true_values = generated_values['true_values']
+    elif model_name == 'chronos':
+        predictor = ChronosFinancialForecastingModel(dataProcessor, model_config)
+        predictor.split_and_scale_data()
+        predictor.train()
+        generated_values = predictor.generate_predictions()
+        predicted_values = generated_values['predicted_values']
+        true_values = generated_values['true_values']
     else:
         predictor = DartsFinancialForecastingModel(model_name, dataProcessor, model_config)
         train_series, valid_series, test_series, test_dates, test_bid_prices, test_ask_prices, test_with_prompt, test_without_prompt = predictor.split_and_scale_data()
@@ -85,12 +92,12 @@ def run_sl_based_trading_strategy(model_name, model_config, trade_thresholds):
 
     # Group data by date for trading simulation
     chunked_values = group_data_by_date(
-        parsed_test_dates, 
-        true_values, 
+        parsed_test_dates,
+        true_values,
         predicted_values,
-        test_bid_prices, 
+        test_bid_prices,
         test_ask_prices,
-        test_with_prompt, 
+        test_with_prompt,
         test_without_prompt
     )
 
