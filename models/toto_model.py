@@ -6,12 +6,8 @@ from models.toto.toto.data.util.dataset import MaskedTimeseries
 from models.toto.toto.inference.forecaster import TotoForecaster
 from models.toto.toto.model.toto import Toto
 
-INPUT_CHUNK_LENGTH: int = 128
-BATCH_SIZE: int = 10
 NUM_SAMPLES: int = 32
-TRAIN_RATIO: float = 0.6
 TIME_INTERVAL_SECONDS: float = 60.0
-PREDICTION_LENGTH: int = 1
 
 class TotoFinancialForecastingModel(FinancialForecastingModel):
     """Financial forecasting model using Toto's pre-trained transformer for zero-shot forecasting"""
@@ -21,6 +17,12 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
         self.model_config = model_config
         self.scaler = MinMaxScaler(feature_range=(0, 1))
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        # Use constants from model_config
+        self.input_chunk_length = model_config.INPUT_CHUNK_LENGTH
+        self.batch_size = model_config.BATCH_SIZE
+        self.train_ratio = model_config.TRAIN_RATIO
+        self.prediction_length = model_config.OUTPUT_CHUNK_LENGTH
 
         # Initialize model components
         self.toto = None
@@ -82,7 +84,7 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
 
         # Calculate split indices to prevent data leakage
         total_length = len(mid_price_series)
-        self.train_size = int(total_length * TRAIN_RATIO)
+        self.train_size = int(total_length * self.train_ratio)
 
         print(f"Total data points: {total_length}")
         print(f"Training data points: {self.train_size}")
@@ -148,9 +150,9 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
             with torch.no_grad():
                 forecast = self.forecaster.forecast(
                     inputs,
-                    prediction_length=PREDICTION_LENGTH,
-                    num_samples=NUM_SAMPLES,
-                    samples_per_batch=NUM_SAMPLES,
+                    prediction_length=self.prediction_length,
+                    num_samples=self.num_samples,
+                    samples_per_batch=self.num_samples,
                 )
 
             # Extract predictions using median for robustness
@@ -176,17 +178,17 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
         # Get all valid prediction indices
         valid_indices = list(range(test_start, total_points))
 
-        for batch_idx in range(0, len(valid_indices), BATCH_SIZE):
-            batch_slice = valid_indices[batch_idx : batch_idx + BATCH_SIZE]
-            batch_num = batch_idx // BATCH_SIZE + 1
-            total_batches = (len(valid_indices) + BATCH_SIZE - 1) // BATCH_SIZE
+        for batch_idx in range(0, len(valid_indices), self.batch_size):
+            batch_slice = valid_indices[batch_idx : batch_idx + self.batch_size]
+            batch_num = batch_idx // self.batch_size + 1
+            total_batches = (len(valid_indices) + self.batch_size - 1) // self.batch_size
             
             print(f"Batch {batch_num}/{total_batches} = predicting for the following indices {batch_slice}")
 
             # Create batch sequences
             batch_sequences = []
             for i in batch_slice:
-                sequence = scaled_data[i - INPUT_CHUNK_LENGTH : i]
+                sequence = scaled_data[i - self.input_chunk_length : i]
                 batch_sequences.append(sequence)
             
             print(f"Batch {batch_num} = {len(batch_sequences)} sequences of length {[len(seq) for seq in batch_sequences]}")
