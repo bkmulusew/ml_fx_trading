@@ -143,7 +143,7 @@ def run_sl_based_trading_strategy(model_name, model_config):
         if (len(values['true_values']) < 7):
             continue
 
-        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.USE_FRAC_KELLY)
+        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B)
         trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["with_prompt"], enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS, hold_position=model_config.HOLD_POSITION)
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
@@ -313,7 +313,7 @@ def run_sl_based_trading_strategy(model_name, model_config):
         if (len(values['true_values']) < 7):
             continue
 
-        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.USE_FRAC_KELLY)
+        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B)
         trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["with_prompt"], use_kelly=False, enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS, hold_position=model_config.HOLD_POSITION)
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
