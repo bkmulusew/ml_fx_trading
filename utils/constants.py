@@ -10,7 +10,7 @@ class ModelConfig:
     TRAIN_RATIO: float = 0.5
     WALLET_A: float = 10000.0
     WALLET_B: float = 10000.0
-    ENABLE_FRAC_KELLY: bool = True
+    USE_FRAC_KELLY: bool = True
     ENABLE_TRANSACTION_COSTS: bool = False
     HOLD_POSITION: bool = False
     OUTPUT_DIR: str = "results/usd-cny-2023"

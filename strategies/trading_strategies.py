@@ -5,9 +5,8 @@ from utils import TradingUtils
 
 class TradingStrategy():
     """Trading Strategy for Supervised Learning based models, implementing different trading strategies using Kelly criterion for optimal bet sizing."""
-    def __init__(self, wallet_a, wallet_b, frac_kelly):
+    def __init__(self, wallet_a, wallet_b):
         """Initialize the TradingStrategy class with the initial wallet balances and Kelly fraction option."""
-        self.frac_kelly = frac_kelly
         # Initialize wallets for different trading strategies
         self.wallet_a = {'mean_reversion': wallet_a, 'trend': wallet_a, 'pure_forcasting': wallet_a, 'hybrid_mean_reversion': wallet_a, 'hybrid_trend': wallet_a, 'ensemble': wallet_a}
         self.wallet_b = {'mean_reversion': wallet_b, 'trend': wallet_b, 'pure_forcasting': wallet_b, 'hybrid_mean_reversion': wallet_b, 'hybrid_trend': wallet_b, 'ensemble': wallet_b}
