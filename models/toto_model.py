@@ -1,3 +1,4 @@
+from types import NoneType
 from models import FinancialForecastingModel
 import numpy as np
 import torch
@@ -5,6 +6,8 @@ from sklearn.preprocessing import MinMaxScaler
 from models.toto.toto.data.util.dataset import MaskedTimeseries
 from models.toto.toto.inference.forecaster import TotoForecaster
 from models.toto.toto.model.toto import Toto
+from datetime import datetime
+import pytz
 
 NUM_SAMPLES: int = 32
 TIME_INTERVAL_SECONDS: float = 60.0
@@ -97,6 +100,16 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
         # Fit scaler ONLY on training data to prevent data leakage
         self.scaler.fit(train_data.reshape(-1, 1))
 
+        params = {
+            "min_": self.scaler.min_.tolist(),
+            "scale_": self.scaler.scale_.tolist(),
+            "data_min_": self.scaler.data_min_.tolist(),
+            "data_max_": self.scaler.data_max_.tolist(),
+            "data_range_": self.scaler.data_range_.tolist(),
+            "feature_range": self.scaler.feature_range
+        }
+
+        print(params)
         # Scale training and test data separately
         train_scaled = self.scaler.transform(train_data.reshape(-1, 1)).flatten()
         test_scaled = self.scaler.transform(test_data.reshape(-1, 1)).flatten()
@@ -133,7 +146,24 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
         batch_array = np.array(input_sequences, dtype=np.float32)
         batch_tensor = torch.FloatTensor(batch_array).to(self.device)
 
-        timestamp_seconds = torch.zeros_like(batch_tensor).to(self.device)
+        # nyc_tz = pytz.timezone("America/New_York")
+
+        # train_dates_posix = [
+        #     nyc_tz.localize(datetime.strptime(dt_str, "%m/%d/%Y %H:%M"))
+        #         .astimezone(pytz.utc)
+        #         .timestamp()
+        #     for dt_str in self.test_dates]
+        
+
+        # num_timestamps = INPUT_CHUNK_LENGTH + BATCH_SIZE - 1
+        # timestamps = train_dates_posix[:num_timestamps]
+
+        # timestamps_tensor = torch.LongTensor(timestamps)
+
+        # timestamp_windows = timestamps_tensor.unfold(0, BATCH_SIZE, 1) # this yields bad performance
+        # timestamp_seconds = timestamp_windows.transpose(0, 1).contiguous().to(self.device)
+        timestamp_seconds = torch.zeros_like(batch_tensor).to(self.device) # this yields great performance
+
         time_interval_seconds = torch.full((batch_tensor.size(0),), TIME_INTERVAL_SECONDS, dtype=torch.float32).to(self.device)
 
         # Wrap in MaskedTimeseries
@@ -183,7 +213,7 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
             batch_num = batch_idx // self.batch_size + 1
             total_batches = (len(valid_indices) + self.batch_size - 1) // self.batch_size
             
-            print(f"Batch {batch_num}/{total_batches} = predicting for the following indices {batch_slice}")
+            print(f"Batch {batch_num}/{total_batches} = predicting for the following indices {batch_slice[0]} - {batch_slice[-1]}")
 
             # Create batch sequences
             batch_sequences = []
@@ -191,7 +221,7 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
                 sequence = scaled_data[i - self.input_chunk_length : i]
                 batch_sequences.append(sequence)
             
-            print(f"Batch {batch_num} = {len(batch_sequences)} sequences of length {[len(seq) for seq in batch_sequences]}")
+            print(f"Batch {batch_num} = {len(batch_sequences)} sequences of length {len(batch_sequences[0])}")
 
             batch_predictions = self.predict_future_values(batch_sequences)
             print(f"Batch {batch_num} = {batch_predictions} batch predictions")
