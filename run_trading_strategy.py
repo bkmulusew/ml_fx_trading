@@ -11,6 +11,23 @@ from collections import defaultdict
 from datetime import datetime
 import matplotlib.pyplot as plt
 
+# importing to set up reproduceability 
+import os
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+import torch
+import random
+import numpy as np
+def set_seed(seed):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        torch.use_deterministic_algorithms(True)
+
+
 def plot_prediction_comparison(true_values, predicted_values, model_name, output_dir):
     """Plot true vs predicted values and save the figure."""
     plt.plot(true_values, color='blue', label='True')
@@ -486,6 +503,7 @@ def print_model_config(config):
     print(f"  Output Directory          : {config.OUTPUT_DIR}")
 
 if __name__ == "__main__":
+    set_seed(11)
     parser = argparse.ArgumentParser()
     parser.add_argument("--wallet_a", type=float, default=5487000.0, help="Amount of money in wallet A (currency A).")
     parser.add_argument("--wallet_b", type=float, default=1000000.0, help="Amount of money in wallet B (currency B).")
@@ -509,4 +527,5 @@ if __name__ == "__main__":
     parser.add_argument("--output_dir", type=str, default="results/usd-cny-2023", help="Directory to save all outputs.")
 
     args = parser.parse_args()
+    
     run(args)
