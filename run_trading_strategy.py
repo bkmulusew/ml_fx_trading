@@ -1,6 +1,6 @@
 from utils import ModelConfig
 from data_processing import DataProcessor
-from models import DartsFinancialForecastingModel, PytorchFinancialForecastingModel, TotoFinancialForecastingModel
+from models import DartsFinancialForecastingModel, PytorchFinancialForecastingModel, ChronosFinancialForecastingModel, TotoFinancialForecastingModel
 from metrics import ModelEvaluationMetrics
 from matplotlib import pyplot as plt
 import numpy as np
@@ -86,6 +86,17 @@ def run_sl_based_trading_strategy(model_name, model_config):
         true_values = generated_values['true_values']
     elif model_name == 'toto':
         predictor = TotoFinancialForecastingModel(dataProcessor, model_config)
+        generated_values = predictor.generate_predictions()
+        predicted_values = generated_values['predicted_values']
+        true_values = generated_values['true_values']
+
+        test_dates = generated_values.get('test_dates', [])
+        test_bid_prices = generated_values.get('test_bid_prices', [])
+        test_ask_prices = generated_values.get('test_ask_prices', [])
+        test_with_prompt = generated_values.get('test_with_prompt', [])
+        test_without_prompt = generated_values.get('test_without_prompt', [])
+    elif model_name == 'chronos':
+        predictor = ChronosFinancialForecastingModel(dataProcessor, model_config)
         generated_values = predictor.generate_predictions()
         predicted_values = generated_values['predicted_values']
         true_values = generated_values['true_values']
@@ -505,8 +516,8 @@ def print_model_config(config):
 if __name__ == "__main__":
     set_seed(11)
     parser = argparse.ArgumentParser()
-    parser.add_argument("--wallet_a", type=float, default=5487000.0, help="Amount of money in wallet A (currency A).")
-    parser.add_argument("--wallet_b", type=float, default=1000000.0, help="Amount of money in wallet B (currency B).")
+    parser.add_argument("--wallet_a", type=float, default=54870.0, help="Amount of money in wallet A (currency A).")
+    parser.add_argument("--wallet_b", type=float, default=10000.0, help="Amount of money in wallet B (currency B).")
     parser.add_argument(
         "--model",
         type=str,
@@ -515,10 +526,10 @@ if __name__ == "__main__":
             'nbeats' for NBEATS, 'nhits' for NHiTS, 'transformer' for Transformer, and 'tcn' for Temporal Convolutional Network. \
             Default is 'tcn'."
     )
-    parser.add_argument("--input_chunk_length", type=int, default=64, help="Length of the input sequences.")
+    parser.add_argument("--input_chunk_length", type=int, default=32, help="Length of the input sequences.")
     parser.add_argument("--output_chunk_length", type=int, default=1, help="Length of the output sequences.")
     parser.add_argument("--n_epochs", type=int, default=50, help="Number of training epochs.")
-    parser.add_argument("--batch_size", type=int, default=1024, help="Batch size for training.")
+    parser.add_argument("--batch_size", type=int, default=64, help="Batch size for training.")
     parser.add_argument("--train_ratio", type=float, default=0.5, help="Ratio of training data used in the train/test split.")
     parser.add_argument("--data_path", type=str, default="", help="Path to the training data. Currency rates should be provided as 1 A / 1 B, where A and B are the respective currencies.", required=True)
     parser.add_argument("--use_frac_kelly", action="store_true", help="Use fractional Kelly to size bets. Default is False.")
