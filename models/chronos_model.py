@@ -34,7 +34,7 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
 
         print(f"Initializing Chronos Model with context length {self.input_chunk_length},\n"
               f"               batch size {self.batch_size} and prediction length {self.prediction_length}")
-        self.MODEL_NAME = "autogluon/chronos-bolt-small"
+        self.MODEL_NAME = "autogluon/chronos-bolt-base"
         self.initialize_model()
 
     def initialize_model(self):
@@ -46,7 +46,6 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
             print(f"Error initializing Chronos model: {e}")
 
     def split_and_scale_data(self):
-        # Extract raw data
         try:
             dates, bid_prices, ask_prices, mid_price_series, with_prompt_values, without_prompt_values = (
                 self.data_processor.extract_price_time_series()
@@ -66,15 +65,6 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
         test_data = mid_price_series[self.train_size:]
 
         self.scaler.fit(train_data.reshape(-1, 1))
-
-        params = {
-            "min_": self.scaler.min_.tolist(),
-            "scale_": self.scaler.scale_.tolist(),
-            "data_min_": self.scaler.data_min_.tolist(),
-            "data_max_": self.scaler.data_max_.tolist(),
-            "data_range_": self.scaler.data_range_.tolist(),
-            "feature_range": self.scaler.feature_range
-        }
 
         train_scaled = self.scaler.transform(train_data.reshape(-1, 1)).flatten()
         test_scaled = self.scaler.transform(test_data.reshape(-1, 1)).flatten()
