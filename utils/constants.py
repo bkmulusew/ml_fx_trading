@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 @dataclass
 class ModelConfig:
+    MODEL_NAME: str = "tcn"
     INPUT_CHUNK_LENGTH: int = 64
     OUTPUT_CHUNK_LENGTH: int = 1
     N_EPOCHS: int = 3

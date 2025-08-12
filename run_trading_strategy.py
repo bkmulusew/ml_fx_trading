@@ -11,15 +11,15 @@ from collections import defaultdict
 from datetime import datetime
 import matplotlib.pyplot as plt
 
-def plot_prediction_comparison(true_values, predicted_values, model_name, output_dir):
+def plot_prediction_comparison(true_values, predicted_values, model_config):
     """Plot true vs predicted values and save the figure."""
     plt.plot(true_values, color='blue', label='True')
-    plt.plot(predicted_values, color='red', label=f'{model_name} Prediction')
-    plt.title(f'True and Predicted Values (Model: {model_name})')
+    plt.plot(predicted_values, color='red', label=f'{model_config.MODEL_NAME} Prediction')
+    plt.title(f'True and Predicted Values (Model: {model_config.MODEL_NAME})')
     plt.xlabel('Observations')
     plt.ylabel('Ratio')
     plt.legend()
-    plt.savefig(f'{output_dir}/true_vs_predicted_{model_name}.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'{model_config.OUTPUT_DIR}/true_vs_predicted_{model_config.MODEL_NAME}.png', dpi=300, bbox_inches='tight')
     plt.clf()
 
 def group_data_by_date(dates, true_values, predicted_values, bid_prices, ask_prices, with_prompt_values, without_prompt_values):
@@ -50,7 +50,7 @@ def group_data_by_date(dates, true_values, predicted_values, bid_prices, ask_pri
     
     return chunked_values
 
-def run_sl_based_trading_strategy(model_name, model_config):
+def run_sl_based_trading_strategy(model_config):
     """Run a trading strategy based on a supervised learning model, including model training, prediction,
     and evaluation of trading performance."""
     # Initialize metrics evaluator
@@ -60,14 +60,14 @@ def run_sl_based_trading_strategy(model_name, model_config):
     dataProcessor = DataProcessor(model_config)
 
     # Train model and get predictions
-    if model_name == 'bilstm':
-        predictor = PytorchFinancialForecastingModel(model_name, dataProcessor, model_config)
+    if model_config.MODEL_NAME == 'bilstm':
+        predictor = PytorchFinancialForecastingModel(dataProcessor, model_config)
         processed_data = predictor.split_and_scale_data()
         predictor.train(processed_data['x_train'], processed_data['y_train'], processed_data['x_valid'], processed_data['y_valid'])
         generated_values = predictor.generate_predictions(processed_data['x_test'], processed_data['y_test'])
         predicted_values = generated_values['predicted_values']
         true_values = generated_values['true_values']
-    elif model_name == 'toto':
+    elif model_config.MODEL_NAME == 'toto':
         predictor = TotoFinancialForecastingModel(dataProcessor, model_config)
         generated_values = predictor.generate_predictions()
         predicted_values = generated_values['predicted_values']
@@ -79,19 +79,19 @@ def run_sl_based_trading_strategy(model_name, model_config):
         test_with_prompt = generated_values.get('test_with_prompt', [])
         test_without_prompt = generated_values.get('test_without_prompt', [])
     else:
-        predictor = DartsFinancialForecastingModel(model_name, dataProcessor, model_config)
+        predictor = DartsFinancialForecastingModel(dataProcessor, model_config)
         train_series, valid_series, test_series, test_dates, test_bid_prices, test_ask_prices, test_with_prompt, test_without_prompt = predictor.split_and_scale_data()
         predictor.train(train_series, valid_series)
         predicted_values = predictor.generate_predictions(test_series)
         true_values = predictor.get_true_values(test_series)
 
     # Calculate and print the prediction error.
-    print(f"Model: {model_name}")
+    print(f"Model: {model_config.MODEL_NAME}")
     prediction_error_model = eval_metrics.calculate_prediction_error(predicted_values, true_values)
-    print(f"Prediction Error for {model_name}: {prediction_error_model}")
+    print(f"Prediction Error for {model_config.MODEL_NAME}: {prediction_error_model}")
     print (f"\n")
 
-    plot_prediction_comparison(true_values, predicted_values, model_name, model_config.OUTPUT_DIR)
+    plot_prediction_comparison(true_values, predicted_values, model_config)
 
     parsed_test_dates = [datetime.strptime(date, "%m/%d/%Y %H:%M") for date in test_dates]
 
@@ -206,7 +206,7 @@ def run_sl_based_trading_strategy(model_name, model_config):
 
     plt.plot(cumulative_mean_reversion_profit_per_trade, color='purple', label='Cumulative Mean Reversion Profit Per Trade')
     plt.plot(cumulative_trend_profit_per_trade, color='blue', label='Cumulative Trend Profit Per Trade')
-    plt.plot(cumulative_forecasting_profit_per_trade, color='red', label=f'Cumulative Forecasting Profit Per Trade {model_name}')
+    plt.plot(cumulative_forecasting_profit_per_trade, color='red', label=f'Cumulative Forecasting Profit Per Trade {model_config.MODEL_NAME}')
     plt.plot(cumulative_hybrid_mean_reversion_profit_per_trade, color='green', label='Cumulative Hybrid Mean Reversion Profit Per Trade')
     plt.plot(cumulative_hybrid_trend_profit_per_trade, color='brown', label='Cumulative Hybrid Trend Profit Per Trade')
     plt.plot(cumulative_ensemble_profit_per_trade, color='orange', label='Cumulative Ensemble Profit Per Trade')
@@ -220,7 +220,7 @@ def run_sl_based_trading_strategy(model_name, model_config):
 
     plt.plot(cumulative_mean_reversion_profit, color='purple', label='Cumulative Mean Reversion Profit')
     plt.plot(cumulative_trend_profit, color='blue', label='Cumulative Trend Profit')
-    plt.plot(cumulative_forecasting_profit, color='red', label=f'Cumulative Forecasting Profit {model_name}')
+    plt.plot(cumulative_forecasting_profit, color='red', label=f'Cumulative Forecasting Profit {model_config.MODEL_NAME}')
     plt.plot(cumulative_hybrid_mean_reversion_profit, color='green', label='Cumulative Hybrid Mean Reversion Profit')
     plt.plot(cumulative_hybrid_trend_profit, color='brown', label='Cumulative Hybrid Trend Profit')
     plt.plot(cumulative_ensemble_profit, color='orange', label='Cumulative Ensemble Profit')
@@ -234,7 +234,7 @@ def run_sl_based_trading_strategy(model_name, model_config):
 
     plt.plot(mean_reversion_profit, color='purple', label='Mean Reversion Profit')
     plt.plot(trend_profit, color='blue', label='Trend Profit')
-    plt.plot(forecasting_profit, color='red', label=f'Forcasting Profit {model_name}')
+    plt.plot(forecasting_profit, color='red', label=f'Forcasting Profit {model_config.MODEL_NAME}')
     plt.plot(hybrid_mean_reversion_profit, color='green', label='Hybrid Mean Reversion Profit')
     plt.plot(hybrid_trend_profit, color='brown', label='Hybrid Trend Profit')
     plt.plot(ensemble_profit, color='orange', label='Ensemble Profit')
@@ -248,7 +248,7 @@ def run_sl_based_trading_strategy(model_name, model_config):
 
     plt.plot(mean_reversion_profit_per_trade, color='purple', label='Mean Reversion Profit Per Trade')
     plt.plot(trend_profit_per_trade, color='blue', label='Trend Profit Per Trade')
-    plt.plot(forecasting_profit_per_trade, color = 'red', label = f'Forcasting Profit Per Trade {model_name}')
+    plt.plot(forecasting_profit_per_trade, color = 'red', label = f'Forcasting Profit Per Trade {model_config.MODEL_NAME}')
     plt.plot(hybrid_mean_reversion_profit_per_trade, color='green', label='Hybrid Mean Reversion Profit Per Trade')
     plt.plot(hybrid_trend_profit_per_trade, color='brown', label='Hybrid Trend Profit Per Trade')
     plt.plot(ensemble_profit_per_trade, color='orange', label='Ensemble Profit Per Trade')
@@ -262,7 +262,7 @@ def run_sl_based_trading_strategy(model_name, model_config):
 
     plt.plot(mean_reversion_sharpe_ratios, color='purple', label='Mean Reversion Sharpe Ratio')
     plt.plot(trend_sharpe_ratios, color='blue', label='Trend Sharpe Ratio')
-    plt.plot(forecasting_sharpe_ratios, color='red', label=f'Forecasting Sharpe Ratio {model_name}')
+    plt.plot(forecasting_sharpe_ratios, color='red', label=f'Forecasting Sharpe Ratio {model_config.MODEL_NAME}')
     plt.plot(hybrid_mean_reversion_sharpe_ratios, color='green', label='Hybrid Mean Reversion Sharpe Ratio')
     plt.plot(hybrid_trend_sharpe_ratios, color='brown', label='Hybrid Trend Sharpe Ratio')
     plt.plot(ensemble_sharpe_ratios, color='orange', label='Ensemble Sharpe Ratio')
@@ -376,7 +376,7 @@ def run_sl_based_trading_strategy(model_name, model_config):
 
     plt.plot(cumulative_mean_reversion_profit_per_trade, color='purple', label='Cumulative Mean Reversion Profit Per Trade')
     plt.plot(cumulative_trend_profit_per_trade, color='blue', label='Cumulative Trend Profit Per Trade')
-    plt.plot(cumulative_forecasting_profit_per_trade, color='red', label=f'Cumulative Forecasting Profit Per Trade {model_name}')
+    plt.plot(cumulative_forecasting_profit_per_trade, color='red', label=f'Cumulative Forecasting Profit Per Trade {model_config.MODEL_NAME}')
     plt.plot(cumulative_hybrid_mean_reversion_profit_per_trade, color='green', label='Cumulative Hybrid Mean Reversion Profit Per Trade')
     plt.plot(cumulative_hybrid_trend_profit_per_trade, color='brown', label='Cumulative Hybrid Trend Profit Per Trade')
     plt.plot(cumulative_ensemble_profit_per_trade, color='orange', label='Cumulative Ensemble Profit Per Trade')
@@ -390,7 +390,7 @@ def run_sl_based_trading_strategy(model_name, model_config):
 
     plt.plot(cumulative_mean_reversion_profit, color='purple', label='Cumulative Mean Reversion Profit')
     plt.plot(cumulative_trend_profit, color='blue', label='Cumulative Trend Profit')
-    plt.plot(cumulative_forecasting_profit, color='red', label=f'Cumulative Forecasting Profit {model_name}')
+    plt.plot(cumulative_forecasting_profit, color='red', label=f'Cumulative Forecasting Profit {model_config.MODEL_NAME}')
     plt.plot(cumulative_hybrid_mean_reversion_profit, color='green', label='Cumulative Hybrid Mean Reversion Profit')
     plt.plot(cumulative_hybrid_trend_profit, color='brown', label='Cumulative Hybrid Trend Profit')
     plt.plot(cumulative_ensemble_profit, color='orange', label='Cumulative Ensemble Profit')
@@ -404,7 +404,7 @@ def run_sl_based_trading_strategy(model_name, model_config):
 
     plt.plot(mean_reversion_profit, color='purple', label='Mean Reversion Profit')
     plt.plot(trend_profit, color='blue', label='Trend Profit')
-    plt.plot(forecasting_profit, color = 'red', label = f'Forcasting Profit {model_name}')
+    plt.plot(forecasting_profit, color = 'red', label = f'Forcasting Profit {model_config.MODEL_NAME}')
     plt.plot(hybrid_mean_reversion_profit, color='green', label='Hybrid Mean Reversion Profit')
     plt.plot(hybrid_trend_profit, color='brown', label='Hybrid Trend Profit')
     plt.plot(ensemble_profit, color='orange', label='Ensemble Profit')
@@ -418,7 +418,7 @@ def run_sl_based_trading_strategy(model_name, model_config):
 
     plt.plot(mean_reversion_profit_per_trade, color='purple', label='Mean Reversion Profit Per Trade')
     plt.plot(trend_profit_per_trade, color='blue', label='Trend Profit Per Trade')
-    plt.plot(forecasting_profit_per_trade, color = 'red', label = f'Forcasting Profit Per Trade {model_name}')
+    plt.plot(forecasting_profit_per_trade, color = 'red', label = f'Forcasting Profit Per Trade {model_config.MODEL_NAME}')
     plt.plot(hybrid_mean_reversion_profit_per_trade, color='green', label='Hybrid Mean Reversion Profit Per Trade')
     plt.plot(hybrid_trend_profit_per_trade, color='brown', label='Hybrid Trend Profit Per Trade')
     plt.plot(ensemble_profit_per_trade, color='orange', label='Ensemble Profit Per Trade')
@@ -432,7 +432,7 @@ def run_sl_based_trading_strategy(model_name, model_config):
 
     plt.plot(mean_reversion_sharpe_ratios, color='purple', label='Mean Reversion Sharpe Ratio')
     plt.plot(trend_sharpe_ratios, color='blue', label='Trend Sharpe Ratio')
-    plt.plot(forecasting_sharpe_ratios, color='red', label=f'Forecasting Sharpe Ratio {model_name}')
+    plt.plot(forecasting_sharpe_ratios, color='red', label=f'Forecasting Sharpe Ratio {model_config.MODEL_NAME}')
     plt.plot(hybrid_mean_reversion_sharpe_ratios, color='green', label='Hybrid Mean Reversion Sharpe Ratio')
     plt.plot(hybrid_trend_sharpe_ratios, color='brown', label='Hybrid Trend Sharpe Ratio')
     plt.plot(ensemble_sharpe_ratios, color='orange', label='Ensemble Sharpe Ratio')
@@ -463,12 +463,12 @@ def run(args):
     model_config.OUTPUT_DIR = os.path.join(root_dir, args.output_dir)
     os.makedirs(model_config.OUTPUT_DIR, exist_ok=True)
 
-    model_name = args.model
+    model_config.MODEL_NAME = args.model_name
 
     print_model_config(model_config)
 
     # Run the trading strategy based on the specified model and configuration.
-    run_sl_based_trading_strategy(model_name, model_config)
+    run_sl_based_trading_strategy(model_config)
 
 def print_model_config(config):
     print("\n🔧 Model Configuration:")
@@ -490,7 +490,7 @@ if __name__ == "__main__":
     parser.add_argument("--wallet_a", type=float, default=5487000.0, help="Amount of money in wallet A (currency A).")
     parser.add_argument("--wallet_b", type=float, default=1000000.0, help="Amount of money in wallet B (currency B).")
     parser.add_argument(
-        "--model",
+        "--model_name",
         type=str,
         default="tcn",
         help="Specify the supervised learning model to use. Supported models include 'bilstm' for Bidirectional LSTM with attention, \
