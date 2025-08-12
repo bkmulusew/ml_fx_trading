@@ -514,7 +514,7 @@ def print_model_config(config):
     print(f"  Output Directory          : {config.OUTPUT_DIR}")
 
 if __name__ == "__main__":
-    set_seed(11)
+    set_seed(25)
     parser = argparse.ArgumentParser()
     parser.add_argument("--wallet_a", type=float, default=54870.0, help="Amount of money in wallet A (currency A).")
     parser.add_argument("--wallet_b", type=float, default=10000.0, help="Amount of money in wallet B (currency B).")
@@ -526,7 +526,7 @@ if __name__ == "__main__":
             'nbeats' for NBEATS, 'nhits' for NHiTS, 'transformer' for Transformer, and 'tcn' for Temporal Convolutional Network. \
             Default is 'tcn'."
     )
-    parser.add_argument("--input_chunk_length", type=int, default=32, help="Length of the input sequences.")
+    parser.add_argument("--input_chunk_length", type=int, default=64, help="Length of the input sequences.")
     parser.add_argument("--output_chunk_length", type=int, default=1, help="Length of the output sequences.")
     parser.add_argument("--n_epochs", type=int, default=50, help="Number of training epochs.")
     parser.add_argument("--batch_size", type=int, default=64, help="Batch size for training.")

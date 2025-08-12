@@ -7,7 +7,7 @@ from models.toto.toto.data.util.dataset import MaskedTimeseries
 from models.toto.toto.inference.forecaster import TotoForecaster
 from models.toto.toto.model.toto import Toto
 
-NUM_SAMPLES: int = 128
+NUM_SAMPLES: int = 512
 TIME_INTERVAL_SECONDS: float = 60.0
 
 class TotoFinancialForecastingModel(FinancialForecastingModel):
