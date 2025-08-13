@@ -20,7 +20,7 @@ This project implements a financial trading strategy that combines machine learn
 
 ## Dataset
 Before training or evaluating the model and running the trading simulation with different pairs trading strategies, it is necessary to have a dataset. The dataset should be in the following format:
-| Date	            | Bid | Ask | Mid | With Prompt | Without Prompt |
+| date	            | bid | ask | mid | with prompt | without prompt |
 | :---                  | :---:  | :---:  | :---:  | :---:  | :---:  |
 | 2/3/2023 16:56	| 6.8004     | 6.8004     | 6.8004     | 0            | 1     |
 | 2/3/2023 16:57	| 6.8038	 | 6.8038	  | 6.8038	   | 0            | 0     |
@@ -28,12 +28,12 @@ Before training or evaluating the model and running the trading simulation with 
 | 2/3/2023 16:59	| 6.805	 | 6.805	  | 6.805	   | 0            | 0	  |
 
 In this dataset:
-- 'Date' represents the timestamp of each data point.
-- 'Bid' represents the bid price from Currency A to Currency B.
-- 'Ask' represents the ask price from Currency A to Currency B.
-- 'Mid' represents the mid price (average of bid and ask prices) from Currency A to Currency B.
-- 'With Prompt' represents the LLM's prediction for Currency A direction after being given an article with prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
-- 'Without Prompt' represents the LLM's prediction for Currency A direction after being given an article without prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
+- 'date' represents the timestamp of each data point.
+- 'bid' represents the bid price from Currency A to Currency B.
+- 'ask' represents the ask price from Currency A to Currency B.
+- 'mid' represents the mid price (average of bid and ask prices) from Currency A to Currency B.
+- 'with prompt' represents the LLM's prediction for Currency A direction after being given an article with prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
+- 'without prompt' represents the LLM's prediction for Currency A direction after being given an article without prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
 
 ## Example Usage
 ```bash
