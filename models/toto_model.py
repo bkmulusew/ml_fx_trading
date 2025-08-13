@@ -9,6 +9,7 @@ from models.toto.toto.model.toto import Toto
 
 NUM_SAMPLES: int = 512
 TIME_INTERVAL_SECONDS: float = 60.0
+PREDICTION_LENGTH: int = 1
 
 class TotoFinancialForecastingModel(FinancialForecastingModel):
     """Financial forecasting model using Toto's pre-trained transformer for zero-shot forecasting"""
@@ -18,12 +19,6 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
         self.model_config = model_config
         self.scaler = MinMaxScaler(feature_range=(0, 1))
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-        # Use constants from model_config
-        self.input_chunk_length = model_config.INPUT_CHUNK_LENGTH
-        self.batch_size = model_config.BATCH_SIZE
-        self.train_ratio = model_config.TRAIN_RATIO
-        self.prediction_length = model_config.OUTPUT_CHUNK_LENGTH
 
         # Initialize model components
         self.toto = None
@@ -85,7 +80,7 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
 
         # Calculate split indices to prevent data leakage
         total_length = len(mid_price_series)
-        self.train_size = int(total_length * self.train_ratio)
+        self.train_size = int(total_length * TRAIN_RATIO)
 
         print(f"Total data points: {total_length}")
         print(f"Training data points: {self.train_size}")
@@ -118,13 +113,13 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
         self.test_start_idx = self.train_size
         self.original_mid_prices = mid_price_series
 
-        # Test metadata - Offset by INPUT_CHUNK_LENGTH to prevent data leakage
-        self.test_dates = dates[self.train_size + self.input_chunk_length:]
-        self.test_bid_prices = bid_prices[self.train_size + self.input_chunk_length:]
-        self.test_ask_prices = ask_prices[self.train_size + self.input_chunk_length:]
-        self.test_with_prompt = with_prompt_values[self.train_size + self.input_chunk_length:]
-        self.test_without_prompt = without_prompt_values[self.train_size + self.input_chunk_length:]
-        self.test_true_values = test_data[self.input_chunk_length:]  # Original scale, offset
+        # Test metadata - aligned with test data
+        self.test_dates = dates[self.train_size:]
+        self.test_bid_prices = bid_prices[self.train_size:]
+        self.test_ask_prices = ask_prices[self.train_size:]
+        self.test_with_prompt = with_prompt_values[self.train_size:]
+        self.test_without_prompt = without_prompt_values[self.train_size:]
+        self.test_true_values = test_data  # Original scale
 
         print(f"Scaler fitted on training data - Min: {train_data.min():.6f}, Max: {train_data.max():.6f}")
         print(f"Test data range - Min: {test_data.min():.6f}, Max: {test_data.max():.6f}")
@@ -160,7 +155,7 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
             with torch.no_grad():
                 forecast = self.forecaster.forecast(
                     inputs,
-                    prediction_length=self.prediction_length,
+                    prediction_length=PREDICTION_LENGTH,
                     num_samples=NUM_SAMPLES,
                     samples_per_batch=NUM_SAMPLES,
                 )
@@ -185,20 +180,20 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
         predictions_scaled = []
         prediction_indices = []
 
-        # Get all valid prediction indices - offset by INPUT_CHUNK_LENGTH to prevent data leakage
-        valid_indices = list(range(test_start + self.input_chunk_length, total_points))
+        # Get all valid prediction indices
+        valid_indices = list(range(test_start, total_points))
 
-        for batch_idx in range(0, len(valid_indices), self.batch_size):
-            batch_slice = valid_indices[batch_idx : batch_idx + self.batch_size]
-            batch_num = batch_idx // self.batch_size + 1
-            total_batches = (len(valid_indices) + self.batch_size - 1) // self.batch_size
+        for batch_idx in range(0, len(valid_indices), BATCH_SIZE):
+            batch_slice = valid_indices[batch_idx : batch_idx + BATCH_SIZE]
+            batch_num = batch_idx // BATCH_SIZE + 1
+            total_batches = (len(valid_indices) + BATCH_SIZE - 1) // BATCH_SIZE
             
             print(f"Batch {batch_num}/{total_batches} = predicting for the following indices {batch_slice[0]} - {batch_slice[-1]}")
 
             # Create batch sequences
             batch_sequences = []
             for i in batch_slice:
-                sequence = scaled_data[i - self.input_chunk_length : i]
+                sequence = scaled_data[i - INPUT_CHUNK_LENGTH : i]
                 batch_sequences.append(sequence)
             
             print(f"Batch {batch_num} = {len(batch_sequences)} sequences of length {len(batch_sequences[0])}")
@@ -236,7 +231,7 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
         
         # Populate true values and metadata
         for i, global_idx in enumerate(prediction_indices):
-            test_idx = global_idx - (test_start + self.input_chunk_length)
+            test_idx = global_idx - test_start
             aligned_results['true_values'].append(self.test_true_values[test_idx])
             aligned_results['test_dates'].append(self.test_dates[test_idx])
             aligned_results['test_bid_prices'].append(self.test_bid_prices[test_idx])
