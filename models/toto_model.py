@@ -1,3 +1,4 @@
+from types import NoneType
 from models import FinancialForecastingModel
 import numpy as np
 import torch
@@ -6,7 +7,7 @@ from models.toto.toto.data.util.dataset import MaskedTimeseries
 from models.toto.toto.inference.forecaster import TotoForecaster
 from models.toto.toto.model.toto import Toto
 
-NUM_SAMPLES: int = 32
+NUM_SAMPLES: int = 512
 TIME_INTERVAL_SECONDS: float = 60.0
 
 class TotoFinancialForecastingModel(FinancialForecastingModel):
@@ -58,8 +59,17 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
         # Split mid price series into train/validation/test
         train_series, val_series, test_series = self._split_mid_price_series(mid_prices, train_end_index, validation_end_index)
 
-        # Scale data
-        scaled_series = self._scale_series_data(train_series, val_series, test_series)
+        # Fit scaler ONLY on training data to prevent data leakage
+        self.scaler.fit(train_data.reshape(-1, 1))
+
+        params = {
+            "min_": self.scaler.min_.tolist(),
+            "scale_": self.scaler.scale_.tolist(),
+            "data_min_": self.scaler.data_min_.tolist(),
+            "data_max_": self.scaler.data_max_.tolist(),
+            "data_range_": self.scaler.data_range_.tolist(),
+            "feature_range": self.scaler.feature_range
+        }
 
         # Process test data
         test_data = self._process_test_data(
@@ -103,9 +113,10 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
         """Make prediction for a batch of input sequences"""
 
         # Convert to tensor (BATCH_SIZE, INPUT_CHUNK_LENGTH)
-        batch_tensor = torch.FloatTensor(input_sequences).to(self.device)
-
+        batch_array = np.array(input_sequences, dtype=np.float32)
+        batch_tensor = torch.FloatTensor(batch_array).to(self.device)
         timestamp_seconds = torch.zeros_like(batch_tensor).to(self.device)
+
         time_interval_seconds = torch.full((batch_tensor.size(0),), TIME_INTERVAL_SECONDS, dtype=torch.float32).to(self.device)
 
         # Wrap in MaskedTimeseries
@@ -139,11 +150,15 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
         # Generate predictions sequentially
         scaled_predictions = []
 
-        for batch_idx in range(0, num_predictions, self.model_config.BATCH_SIZE):
-            # Calculate batch boundaries
-            batch_start = batch_idx
-            batch_end = min(batch_idx + self.model_config.BATCH_SIZE, num_predictions)
-            batch_size_actual = batch_end - batch_start
+        # Get all valid prediction indices - offset by INPUT_CHUNK_LENGTH to prevent data leakage
+        valid_indices = list(range(test_start + self.input_chunk_length, total_points))
+
+        for batch_idx in range(0, len(valid_indices), self.batch_size):
+            batch_slice = valid_indices[batch_idx : batch_idx + self.batch_size]
+            batch_num = batch_idx // self.batch_size + 1
+            total_batches = (len(valid_indices) + self.batch_size - 1) // self.batch_size
+            
+            print(f"Batch {batch_num}/{total_batches} = predicting for the following indices {batch_slice[0]} - {batch_slice[-1]}")
 
             # Create batch of input sequences
             batch_sequences = []
@@ -154,18 +169,23 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
                 end_idx = pred_idx + self.model_config.INPUT_CHUNK_LENGTH
                 sequence = test_series[start_idx:end_idx]
                 batch_sequences.append(sequence)
+            
+            print(f"Batch {batch_num} = {len(batch_sequences)} sequences of length {len(batch_sequences[0])}")
 
-            # Convert to numpy array for batch processing
-            batch_input = np.array(batch_sequences, dtype=np.float32)
-            
-            # Get predictions for this batch
-            batch_predictions = self.predict_future_values(batch_input)
-            
-            # Validate prediction count matches expected batch size
-            if len(batch_predictions) != batch_size_actual:
-                print(f"Warning: Expected {batch_size_actual} predictions, got {len(batch_predictions)}")
-            
-            scaled_predictions.extend(batch_predictions)
+            batch_predictions = self.predict_future_values(batch_sequences)
+            print(f"Batch {batch_num} = {batch_predictions} batch predictions")
+
+            # Store results and log predictions during collection
+            for i, global_idx in enumerate(batch_slice):
+                prediction = batch_predictions[i]
+                true_value = scaled_data[global_idx]
+
+                predictions_scaled.append(prediction)
+                prediction_indices.append(global_idx)
+
+                # Inline progress log
+                # if global_idx % 100 == 0 or global_idx == test_start:
+                print(f"Index {global_idx}: Predicted {prediction:.6f}, True {true_value:.6f}")
 
         # Inverse transform and align metadata
         predicted_values = self.scaler.inverse_transform(
