@@ -19,15 +19,15 @@ class DataProcessor:
         
         # Extract data into respective lists
         dates = df["date"].tolist()
-        bid_prices = df["bid"].tolist()
-        ask_prices = df["ask"].tolist()
+        bid_prices = df["bid_price"].tolist()
+        ask_prices = df["ask_price"].tolist()
         with_prompt_values = df["with_prompt"].tolist()
         without_prompt_values = df["without_prompt"].tolist()
 
         if self.model_config.MODEL_NAME == 'toto' or self.model_config.MODEL_NAME == 'chronos':
-            mid_price_series = df["mid"].values
+            mid_price_series = df["mid_price"].values
         else:
-            mid_price_series = TimeSeries.from_dataframe(df, value_cols=["mid"])
+            mid_price_series = TimeSeries.from_dataframe(df, value_cols=["mid_price"])
 
         return (
             dates,

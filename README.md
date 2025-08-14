@@ -20,7 +20,7 @@ This project implements a financial trading strategy that combines machine learn
 
 ## Dataset
 Before training or evaluating the model and running the trading simulation with different pairs trading strategies, it is necessary to have a dataset. The dataset should be in the following format:
-| date	            | bid | ask | mid | with prompt | without prompt |
+| date	            | bid_price | ask_price | mid_price | with_prompt | without_prompt |
 | :---                  | :---:  | :---:  | :---:  | :---:  | :---:  |
 | 2/3/2023 16:56	| 6.8004     | 6.8004     | 6.8004     | 0            | 1     |
 | 2/3/2023 16:57	| 6.8038	 | 6.8038	  | 6.8038	   | 0            | 0     |
@@ -29,11 +29,11 @@ Before training or evaluating the model and running the trading simulation with 
 
 In this dataset:
 - 'date' represents the timestamp of each data point.
-- 'bid' represents the bid price from Currency A to Currency B.
-- 'ask' represents the ask price from Currency A to Currency B.
-- 'mid' represents the mid price (average of bid and ask prices) from Currency A to Currency B.
-- 'with prompt' represents the LLM's prediction for Currency A direction after being given an article with prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
-- 'without prompt' represents the LLM's prediction for Currency A direction after being given an article without prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
+- 'bid_price' represents the bid price from Currency A to Currency B.
+- 'ask_price' represents the ask price from Currency A to Currency B.
+- 'mid_price' represents the mid price (average of bid and ask prices) from Currency A to Currency B.
+- 'with_prompt' represents the LLM's prediction for Currency A direction after being given an article with prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
+- 'without_prompt' represents the LLM's prediction for Currency A direction after being given an article without prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
 
 ## Example Usage
 ```bash
