@@ -20,7 +20,7 @@ This project implements a financial trading strategy that combines machine learn
 
 ## Dataset
 Before training or evaluating the model and running the trading simulation with different pairs trading strategies, it is necessary to have a dataset. The dataset should be in the following format:
-| date	            | bid | ask | mid | with prompt | without prompt |
+| date	            | bid_price | ask_price | mid_price | with_prompt | without_prompt |
 | :---                  | :---:  | :---:  | :---:  | :---:  | :---:  |
 | 2/3/2023 16:56	| 6.8004     | 6.8004     | 6.8004     | 0            | 1     |
 | 2/3/2023 16:57	| 6.8038	 | 6.8038	  | 6.8038	   | 0            | 0     |
