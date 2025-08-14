@@ -16,25 +16,18 @@ class DataProcessor:
         """Extracts price related data from the DataFrame."""
         
         df = self.load_and_prepare_data()
-    
-        # Define column names for clarity
-        columns = {
-            'date': df.columns[0],
-            'bid': df.columns[1],
-            'ask': df.columns[2],
-            'mid': df.columns[3],
-            'without_prompt': df.columns[4],
-            'with_prompt': df.columns[5]
-        }
         
         # Extract data into respective lists
-        dates = df[columns['date']].tolist()
-        bid_prices = df[columns['bid']].tolist()
-        ask_prices = df[columns['ask']].tolist()
-        with_prompt_values = df[columns['with_prompt']].tolist()
-        without_prompt_values = df[columns['without_prompt']].tolist()
+        dates = df["date"].tolist()
+        bid_prices = df["bid_price"].tolist()
+        ask_prices = df["ask_price"].tolist()
+        with_prompt_values = df["with_prompt"].tolist()
+        without_prompt_values = df["without_prompt"].tolist()
         
-        mid_price_series = TimeSeries.from_dataframe(df, value_cols=[columns['mid']])
+        if self.model_config.MODEL_NAME == 'toto':
+            mid_price_series = df["mid_price"].values
+        else:
+            mid_price_series = TimeSeries.from_dataframe(df, value_cols=["mid_price"])
 
         return (
             dates,

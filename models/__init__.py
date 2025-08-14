@@ -1,4 +1,4 @@
 from .base_model import FinancialForecastingModel
 from .darts_model import DartsFinancialForecastingModel
-# from .pytorch_model import PytorchFinancialForecastingMode
+from .pytorch_model import PytorchFinancialForecastingMode
 from .chronos_model import ChronosFinancialForecastingModel

@@ -6,13 +6,13 @@ from darts.models import NHiTSModel, NBEATSModel, TCNModel, TransformerModel
 
 class DartsFinancialForecastingModel(FinancialForecastingModel):
     """A financial forecasting model based on the Darts library."""
-    def __init__(self, model_name, data_processor, model_config):
+    def __init__(self, data_processor, model_config):
         self.data_processor = data_processor
         self.scaler = None
         self.model_config = model_config
-        self.model = self.initalize_model(model_name)
+        self.model = self.initialize_model(model_config.MODEL_NAME)
 
-    def initalize_model(self, model_name):
+    def initialize_model(self, model_name):
         """Creates the model."""
         if model_name == "nbeats":
             return NBEATSModel(

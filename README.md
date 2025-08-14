@@ -20,7 +20,7 @@ This project implements a financial trading strategy that combines machine learn
 
 ## Dataset
 Before training or evaluating the model and running the trading simulation with different pairs trading strategies, it is necessary to have a dataset. The dataset should be in the following format:
-| Date	            | Bid | Ask | Mid | With Prompt | Without Prompt |
+| date	            | bid_price | ask_price | mid_price | with_prompt | without_prompt |
 | :---                  | :---:  | :---:  | :---:  | :---:  | :---:  |
 | 2/3/2023 16:56	| 6.8004     | 6.8004     | 6.8004     | 0            | 1     |
 | 2/3/2023 16:57	| 6.8038	 | 6.8038	  | 6.8038	   | 0            | 0     |
@@ -28,31 +28,31 @@ Before training or evaluating the model and running the trading simulation with 
 | 2/3/2023 16:59	| 6.805	 | 6.805	  | 6.805	   | 0            | 0	  |
 
 In this dataset:
-- 'Date' represents the timestamp of each data point.
-- 'Bid' represents the bid price from Currency A to Currency B.
-- 'Ask' represents the ask price from Currency A to Currency B.
-- 'Mid' represents the mid price (average of bid and ask prices) from Currency A to Currency B.
-- 'With Prompt' represents the LLM's prediction for Currency A direction after being given an article with prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
-- 'Without Prompt' represents the LLM's prediction for Currency A direction after being given an article without prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
+- 'date' represents the timestamp of each data point.
+- 'bid_price' represents the bid price from Currency A to Currency B.
+- 'ask_price' represents the ask price from Currency A to Currency B.
+- 'mid_price' represents the mid price (average of bid and ask prices) from Currency A to Currency B.
+- 'with_prompt' represents the LLM's prediction for Currency A direction after being given an article with prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
+- 'without_prompt' represents the LLM's prediction for Currency A direction after being given an article without prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
 
 ## Example Usage
 ```bash
-python ml_fx_trading/run_trading_strategy.py --model tcn --data_path /path/to/data --n_epochs 50
+python ml_fx_trading/run_trading_strategy.py --model_name tcn --data_path /path/to/data --n_epochs 50 --output_dir results/without_trx_cost --use_frac_kelly
 ```
 
 The full list of flags and options for the python script is as follows:
 ```
 --wallet_a: Amount of money in wallet A (currency A).
 --wallet_b: Amount of money in wallet B (currency B).
---model: Specify the supervised learning model to use. Supported models include 'bilstm' for Bidirectional LSTM with attention, 'nbeats' for NBEATS, 'nhits' for NHiTS, 'transformer' for Transformer, and 'tcn' for Temporal Convolutional Network.
+--model_name: Specify the supervised learning model to use. Supported models include 'bilstm' for Bidirectional LSTM with attention, 'nbeats' for NBEATS, 'nhits' for NHiTS, 'transformer' for Transformer, and 'tcn' for Temporal Convolutional Network.
 --input_chunk_length: Length of the input sequences.
 --output_chunk_length: Length of the output sequences.
 --n_epochs: Number of training epochs.
 --batch_size: Batch size for training.
 --train_ratio: Ratio of training data used in the train/test split. 1% of the data is used for validation.
 --data_path: Path to the dataset.
---thresholds: Specify a list of threshold values for trading. Provide the values as a comma-separated list of size 4.
-            For example, use '--threshold 0,0.00025,0.0005,0.001' to set thresholds at 0, 0.00025, 0.0005, and 0.001.
---frac_kelly: Enable fractional kelly to size bets.
+--use_frac_kelly: Enable fractional kelly to size bets.
 --enable_transaction_costs: Enable transaction costs.
+--hold_position: Enable holding position.
+--output_dir: Directory to save all outputs.
 ```

@@ -32,17 +32,17 @@ class BiLSTMModel(nn.Module):
 
 class PytorchFinancialForecastingModel(FinancialForecastingModel):
     """A financial forecasting model based on the Pytorch library."""
-    def __init__(self, mode_name, data_processor, model_config):
+    def __init__(self, data_processor, model_config):
         self.data_processor = data_processor
         self.scaler = None
         self.model_config = model_config
-        self.model = self.initalize_model(mode_name)
+        self.model = self.initialize_model(model_config.MODEL_NAME)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=0.0001)
         self.criterion = nn.MSELoss()
 
-    def initalize_model(self, model_name):
+    def initialize_model(self, model_name):
         """Creates the model."""
         if model_name == "bilstm":
             return BiLSTMModel()
