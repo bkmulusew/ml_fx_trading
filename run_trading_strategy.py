@@ -1,6 +1,6 @@
 from utils import ModelConfig
 from data_processing import DataProcessor
-from models import DartsFinancialForecastingModel, PytorchFinancialForecastingModel, ChronosFinancialForecastingModel, TotoFinancialForecastingModel
+from models import DartsFinancialForecastingModel, ChronosFinancialForecastingModel, TotoFinancialForecastingModel#, PytorchFinancialForecastingModel
 from metrics import ModelEvaluationMetrics
 from matplotlib import pyplot as plt
 import numpy as np
@@ -86,26 +86,6 @@ def run_sl_based_trading_strategy(model_config):
         true_values = generated_values['true_values']
     elif model_config.MODEL_NAME == 'toto':
         predictor = TotoFinancialForecastingModel(dataProcessor, model_config)
-        generated_values = predictor.generate_predictions()
-        predicted_values = generated_values['predicted_values']
-        true_values = generated_values['true_values']
-
-        test_dates = generated_values.get('test_dates', [])
-        test_bid_prices = generated_values.get('test_bid_prices', [])
-        test_ask_prices = generated_values.get('test_ask_prices', [])
-        test_with_prompt = generated_values.get('test_with_prompt', [])
-        test_without_prompt = generated_values.get('test_without_prompt', [])
-    elif model_config.MODEL_NAME == 'chronos':
-        predictor = ChronosFinancialForecastingModel(dataProcessor, model_config)
-        generated_values = predictor.generate_predictions()
-        predicted_values = generated_values['predicted_values']
-        true_values = generated_values['true_values']
-
-        test_dates = generated_values.get('test_dates', [])
-        test_bid_prices = generated_values.get('test_bid_prices', [])
-        test_ask_prices = generated_values.get('test_ask_prices', [])
-        test_with_prompt = generated_values.get('test_with_prompt', [])
-        test_without_prompt = generated_values.get('test_without_prompt', [])
         _, _, test_series, test_dates, test_bid_prices, test_ask_prices, test_with_prompt, test_without_prompt = predictor.split_and_scale_data()
         predicted_values = predictor.generate_predictions(test_series)
         true_values = predictor.get_true_values(test_series)

@@ -15,8 +15,8 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model_config = model_config
         self.MODEL_NAME = "autogluon/chronos-bolt-base"
-        print(f"Initializing Chronos Model with context length {self.model_config.input_chunk_length},\n"
-              f"               batch size {self.model_config.batch_size} and prediction length {self.model_config.prediction_length}")
+        print(f"Initializing Chronos Model with context length {self.model_config.INPUT_CHUNK_LENGTH},\n"
+              f"               batch size {self.model_config.BATCH_SIZE} and prediction length {self.model_config.OUTPUT_CHUNK_LENGTH}")
         self.forecaster = self.initialize_model()
 
 
@@ -92,11 +92,11 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
 
         try:
             with torch.no_grad():
-                quantiles, mean = self.forecaster.predict_quantiles(inputs, prediction_length=self.prediction_length)
+                quantiles, mean = self.forecaster.predict_quantiles(inputs, prediction_length=self.model_config.OUTPUT_CHUNK_LENGTH)
                 median_percentile = quantiles[:, :, 4]
                 
-            # predictions = median_percentile.cpu().numpy().flatten()
-            predictions = mean.cpu().numpy().flatten()
+            predictions = median_percentile.cpu().numpy().flatten()
+            # predictions = mean.cpu().numpy().flatten()
             return predictions.tolist()
 
         except Exception as e:
