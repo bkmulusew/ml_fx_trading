@@ -28,7 +28,7 @@ def set_seed(seed):
         torch.use_deterministic_algorithms(True)
 
 
-def plot_prediction_comparison(true_values, predicted_values, model_name, output_dir):
+def plot_prediction_comparison(true_values, predicted_values, model_config):
     """Plot true vs predicted values and save the figure."""
     plt.plot(true_values, color='blue', label='True')
     plt.plot(predicted_values, color='red', label=f'{model_config.MODEL_NAME} Prediction')
@@ -95,7 +95,7 @@ def run_sl_based_trading_strategy(model_config):
         test_ask_prices = generated_values.get('test_ask_prices', [])
         test_with_prompt = generated_values.get('test_with_prompt', [])
         test_without_prompt = generated_values.get('test_without_prompt', [])
-    elif model_name == 'chronos':
+    elif model_config.MODEL_NAME == 'chronos':
         predictor = ChronosFinancialForecastingModel(dataProcessor, model_config)
         generated_values = predictor.generate_predictions()
         predicted_values = generated_values['predicted_values']

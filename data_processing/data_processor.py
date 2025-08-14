@@ -23,8 +23,8 @@ class DataProcessor:
         ask_prices = df["ask"].tolist()
         with_prompt_values = df["with_prompt"].tolist()
         without_prompt_values = df["without_prompt"].tolist()
-        
-        if self.model_config.MODEL_NAME == 'toto':
+
+        if self.model_config.MODEL_NAME == 'toto' or self.model_config.MODEL_NAME == 'chronos':
             mid_price_series = df["mid"].values
         else:
             mid_price_series = TimeSeries.from_dataframe(df, value_cols=["mid"])
