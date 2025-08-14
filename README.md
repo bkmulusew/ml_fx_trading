@@ -29,11 +29,11 @@ Before training or evaluating the model and running the trading simulation with 
 
 In this dataset:
 - 'date' represents the timestamp of each data point.
-- 'bid' represents the bid price from Currency A to Currency B.
-- 'ask' represents the ask price from Currency A to Currency B.
-- 'mid' represents the mid price (average of bid and ask prices) from Currency A to Currency B.
-- 'with prompt' represents the LLM's prediction for Currency A direction after being given an article with prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
-- 'without prompt' represents the LLM's prediction for Currency A direction after being given an article without prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
+- 'bid_price' represents the bid price from Currency A to Currency B.
+- 'ask_price' represents the ask price from Currency A to Currency B.
+- 'mid_price' represents the mid price (average of bid and ask prices) from Currency A to Currency B.
+- 'with_prompt' represents the LLM's prediction for Currency A direction after being given an article with prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
+- 'without_prompt' represents the LLM's prediction for Currency A direction after being given an article without prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
 
 ## Example Usage
 ```bash
