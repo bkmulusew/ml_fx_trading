@@ -1,3 +1,6 @@
+# importing to set up reproducibility 
+import os
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 from utils import ModelConfig
 from data_processing import DataProcessor
 from models import DartsFinancialForecastingModel, ChronosFinancialForecastingModel, TotoFinancialForecastingModel#, PytorchFinancialForecastingModel
@@ -11,9 +14,7 @@ from collections import defaultdict
 from datetime import datetime
 import matplotlib.pyplot as plt
 
-# importing to set up reproducibility 
-import os
-os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+
 import torch
 import random
 import numpy as np
