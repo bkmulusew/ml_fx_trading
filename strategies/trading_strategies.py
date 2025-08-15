@@ -1,7 +1,7 @@
 import numpy as np
 from xgboost import XGBClassifier
-from sklearn.preprocessing import StandardScaler
 from utils import TradingUtils
+from collections import Counter
 
 class TradingStrategy():
     """Trading Strategy for Supervised Learning based models, implementing different trading strategies using Kelly criterion for optimal bet sizing."""
@@ -41,20 +41,20 @@ class TradingStrategy():
         self.fixed_position_size = 1000  # Fixed position size for training
         
         # Initialize XGBoost models with appropriate parameters
-        # self.ensemble_model = LogisticRegression(multi_class='multinomial')
         self.ensemble_model = XGBClassifier(
-            objective='multi:softmax',
+            objective='multi:softprob',
             num_class=3,
             eval_metric='mlogloss',
-            n_estimators=100,
-            max_depth=6,
-            learning_rate=0.1,
+            n_estimators=400,
+            max_depth=5,
+            learning_rate=0.05,
             subsample=0.8,
             colsample_bytree=0.8,
+            reg_lambda=2.0,
             random_state=42,
         )
-        self.ensemble_scaler = StandardScaler()
-        self.default_ensemble_prediction = None
+
+        self.default_ensemble_pred = None
 
         self.label_mapping = {
             'no_trade': 0,
@@ -124,7 +124,7 @@ class TradingStrategy():
             mid_price = (bid_price + ask_price) / 2
             buy_price = sell_price = mid_price
 
-        profit_in_base_currency = 0.0
+        profit_in_base_curr = 0.0
         
         # Check if there's an open position
         if self.open_positions[strategy_name]['type'] is not None:
@@ -134,13 +134,13 @@ class TradingStrategy():
                 new_position_type = 'long' if trade_direction == 'buy_currency_a' else 'short' if trade_direction == 'sell_currency_a' else None
                 
                 if new_position_type is not None and new_position_type != current_position_type:
-                    profit_in_base_currency += self.close_position(strategy_name, sell_price, buy_price)
+                    profit_in_base_curr += self.close_position(strategy_name, sell_price, buy_price)
                 else:
                     # If same type or no trade, don't make a new trade
-                    return profit_in_base_currency
+                    return profit_in_base_curr
             else:
                 # If hold position is not enabled, close the position
-                profit_in_base_currency += self.close_position(strategy_name, sell_price, buy_price)
+                profit_in_base_curr += self.close_position(strategy_name, sell_price, buy_price)
         
         # Then open new position if there's a trade signal and no matching position type
         if trade_direction != 'no_trade':
@@ -183,12 +183,12 @@ class TradingStrategy():
                         'entry_ratio': sell_price
                     }
         
-        return profit_in_base_currency
+        return profit_in_base_curr
     
     def close_position(self, strategy_name, sell_price, buy_price):
         """Close an open position and calculate profit/loss"""
         position = self.open_positions[strategy_name]
-        profit_in_base_currency = 0.0
+        profit_in_base_curr = 0.0
         
         if position['type'] == 'long':
             # Close long position (sell currency A)
@@ -197,7 +197,7 @@ class TradingStrategy():
             exit_amount_b = position['size_a'] * sell_price
             self.wallet_a[strategy_name] -= position['size_a']
             self.wallet_b[strategy_name] += exit_amount_b
-            profit_in_base_currency = position['size_a'] * (sell_price - position['entry_ratio']) / buy_price
+            profit_in_base_curr = position['size_a'] * (sell_price - position['entry_ratio']) / buy_price
             
         elif position['type'] == 'short':
             # Close short position (buy currency A)
@@ -206,47 +206,90 @@ class TradingStrategy():
             exit_amount_a = position['size_b'] / buy_price
             self.wallet_b[strategy_name] -= position['size_b']
             self.wallet_a[strategy_name] += exit_amount_a
-            profit_in_base_currency = position['size_a'] * (position['entry_ratio'] - buy_price) / buy_price
+            profit_in_base_curr = position['size_a'] * (position['entry_ratio'] - buy_price) / buy_price
         
         # Reset position tracking
         self.open_positions[strategy_name] = {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0}
         self.num_trades[strategy_name] += 1
         
-        return profit_in_base_currency
+        return profit_in_base_curr
 
-    def determine_trade_direction(self, strategy_name, base_ratio_change, predicted_ratio_change, base_lower_threshold, 
-                                  base_upper_threshold, predicted_lower_threshold, predicted_upper_threshold, llm_sentiment):
+    # def determine_trade_direction(self, strategy_name, base_pct_change, pred_pct_change, base_lower_band, 
+    #                               base_upper_band, pred_lower_band, pred_upper_band, llm_sentiment):
+    #     """Determine the trade direction based on strategy and ratio changes."""
+    #     trade_direction = 'no_trade'
+
+    #     if(strategy_name == "mean_reversion"):
+    #         if base_pct_change < base_lower_band:
+    #             trade_direction = 'buy_currency_a'
+    #         elif base_pct_change > base_upper_band:
+    #             trade_direction = 'sell_currency_a'
+
+    #     elif(strategy_name == "trend"):
+    #         if base_pct_change < base_lower_band:
+    #             trade_direction = 'sell_currency_a'
+    #         elif base_pct_change > base_upper_band:
+    #             trade_direction = 'buy_currency_a'
+
+    #     elif(strategy_name == "pure_forcasting"):
+    #         if pred_pct_change < pred_lower_band:
+    #             trade_direction = 'sell_currency_a'
+    #         elif pred_pct_change > pred_upper_band:
+    #             trade_direction = 'buy_currency_a'
+
+    #     elif(strategy_name == "hybrid_mean_reversion"):
+    #         if base_pct_change < base_lower_band and pred_pct_change > pred_upper_band:
+    #             trade_direction = 'buy_currency_a'
+    #         elif base_pct_change > base_upper_band and pred_pct_change < pred_lower_band:
+    #             trade_direction = 'sell_currency_a'
+
+    #     elif(strategy_name == "hybrid_trend"):
+    #         if base_pct_change < base_lower_band and pred_pct_change < pred_lower_band:
+    #             trade_direction = 'sell_currency_a'
+    #         elif base_pct_change > base_upper_band and pred_pct_change > pred_upper_band:
+    #             trade_direction = 'buy_currency_a'
+
+    #     elif(strategy_name == 'llm'):
+    #         if(llm_sentiment == -1):
+    #             trade_direction = 'sell_currency_a'
+    #         elif(llm_sentiment == 1):
+    #             trade_direction = 'buy_currency_a'
+            
+    #     return trade_direction
+    
+    def determine_trade_direction(self, strategy_name, base_pct_change, pred_pct_change, base_lower_band, 
+                                  base_upper_band, pred_lower_band, pred_upper_band, llm_sentiment):
         """Determine the trade direction based on strategy and ratio changes."""
         trade_direction = 'no_trade'
 
         if(strategy_name == "mean_reversion"):
-            if base_ratio_change < base_lower_threshold:
+            if base_pct_change < 0:
                 trade_direction = 'buy_currency_a'
-            elif base_ratio_change > base_upper_threshold:
+            elif base_pct_change > 0:
                 trade_direction = 'sell_currency_a'
 
         elif(strategy_name == "trend"):
-            if base_ratio_change < base_lower_threshold:
+            if base_pct_change < 0:
                 trade_direction = 'sell_currency_a'
-            elif base_ratio_change > base_upper_threshold:
+            elif base_pct_change > 0:
                 trade_direction = 'buy_currency_a'
 
         elif(strategy_name == "pure_forcasting"):
-            if predicted_ratio_change < predicted_lower_threshold:
+            if pred_pct_change < 0:
                 trade_direction = 'sell_currency_a'
-            elif predicted_ratio_change > predicted_upper_threshold:
+            elif pred_pct_change > 0:
                 trade_direction = 'buy_currency_a'
 
         elif(strategy_name == "hybrid_mean_reversion"):
-            if base_ratio_change < base_lower_threshold and predicted_ratio_change > predicted_upper_threshold:
+            if base_pct_change < 0 and pred_pct_change > 0:
                 trade_direction = 'buy_currency_a'
-            elif base_ratio_change > base_upper_threshold and predicted_ratio_change < predicted_lower_threshold:
+            elif base_pct_change > 0 and pred_pct_change < 0:
                 trade_direction = 'sell_currency_a'
 
         elif(strategy_name == "hybrid_trend"):
-            if base_ratio_change < base_lower_threshold and predicted_ratio_change < predicted_lower_threshold:
+            if base_pct_change < 0 and pred_pct_change < 0:
                 trade_direction = 'sell_currency_a'
-            elif base_ratio_change > base_upper_threshold and predicted_ratio_change > predicted_upper_threshold:
+            elif base_pct_change > 0 and pred_pct_change > 0:
                 trade_direction = 'buy_currency_a'
 
         elif(strategy_name == 'llm'):
@@ -256,45 +299,72 @@ class TradingStrategy():
                 trade_direction = 'buy_currency_a'
             
         return trade_direction
-    
+
     def train_ensemble_model(self, historical_data):
-        """Train the XGBoost model on historical data."""
+        """Train XGB on 3 classes; inject tiny-weight synthetic samples for any missing classes."""
         if not historical_data:
             print("No historical data provided.")
-            self.default_ensemble_prediction = 0  # or None, depending on your system
+            self.default_ensemble_pred = 0
             return
-    
+
+        # Unpack
         X, y = zip(*historical_data)
-        X = list(X)
-        y = list(y)
+        X = np.asarray(X, dtype=np.float32)
+        y = np.asarray(y, dtype=int)
 
-        unique_labels = sorted(list(set(y)))
-        num_unique_labels = len(unique_labels)
-        print(f"Classes found in ensemble training data: {unique_labels}")
+        # We deploy with 3 classes: 0=no_trade, 1=buy, 2=sell
+        expected_classes = [0, 1, 2]
+        present = set(np.unique(y))
+        missing = [c for c in expected_classes if c not in present]
 
-        if num_unique_labels == 1:
-            # Not enough class diversity, fallback to majority class
-            majority_class = unique_labels[0]
-            print(f"Only one class ({majority_class}) present — defaulting to that.")
-            self.default_ensemble_prediction = majority_class
-            return
-        
-        # Add dummy data for the ensemble model to train on so that all the classes are represented
-        X.append([0, 0])
-        y.append(0)
-        X.append([1, 1])
-        y.append(1)
-        X.append([2, 2])
-        y.append(2)
-        
-        # Proceed with model training
-        X = np.array(X)
-        y = np.array(y)
-        # X_scaled = self.ensemble_scaler.fit_transform(X)
+        # If any class missing, create a synthetic feature vector per missing class
+        # Use the feature-wise median as a neutral point, then add tiny jitter
+        if len(missing) > 0:
+            med = np.median(X, axis=0)
+            jitter_scale = 1e-6  # tiny so it won't matter numerically
+            synth_X = []
+            synth_y = []
+            for c in missing:
+                synth = med + np.random.normal(0.0, jitter_scale, size=med.shape)
+                synth_X.append(synth.astype(np.float32))
+                synth_y.append(c)
+            X = np.vstack([X, np.vstack(synth_X)])
+            y = np.concatenate([y, np.array(synth_y, dtype=int)])
 
-        # self.ensemble_model.fit(X_scaled, y)
-        self.ensemble_model.fit(X, y)
-        self.default_ensemble_prediction = None
+        # ----- Sample weights -----
+        # Base weights: class-balanced on the *real* samples only
+        real_mask = np.ones(len(y), dtype=bool)
+        if len(missing) > 0:
+            real_mask[-len(missing):] = False  # last entries are synthetic
+
+        y_real = y[real_mask]
+        cls_counts = Counter(y_real)
+        n_classes = 3
+        total_real = len(y_real)
+
+        # Weight = total_real / (n_classes * count_of_class)
+        # base_w = np.empty_like(y, dtype=np.float32)
+        # for i, yy in enumerate(y):
+        #     if real_mask[i]:
+        #         base_w[i] = total_real / (n_classes * cls_counts[yy])
+        #     else:
+        #         base_w[i] = 1e-6  # tiny weight for synthetic rows
+
+        # ----- Sample weights -----
+        # Only assign tiny weights to synthetic samples, leave real samples at default weight (1.0)
+        base_w = np.ones(len(y), dtype=np.float32)  # Default weight = 1.0 for all
+
+        if len(missing) > 0:
+            # Give tiny weights only to the synthetic samples (last len(missing) entries)
+            base_w[-len(missing):] = 1e-6
+
+        # Fit
+        self.ensemble_model.fit(X, y, sample_weight=base_w)
+        self.default_ensemble_pred = None
+
+        # Print diagnostics
+        print(f"Classes present after augmentation: {sorted(np.unique(y))} "
+            f"(synthetic added for: {missing})")
 
     def display_total_profit(self):
         """Display the total profit or loss for each strategy."""
@@ -320,77 +390,69 @@ class TradingStrategy():
         """Display the number of trades for each strategy."""
         print(f"Number of trades - {self.num_trades}")
     
-    def _generate_training_data(self, actual_rates_train, predicted_rates_train, llm_sentiments_train):
-        """Helper method to generate training data for ensemble model."""
-        historical_data = []
-        base_percentage_increases, predicted_percentage_increases = TradingUtils.calculate_percentage_increases(
-            actual_rates_train, predicted_rates_train
-        )
+    def _generate_training_data(self, actual_rates, pred_rates, llm_sentiments):
+        X, y = [], []
+        base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
         
         # Calculate Bollinger bands
-        _, _, base_upper_bands, base_lower_bands = TradingUtils.calculate_bollinger_bands_for_percentages(base_percentage_increases)
-        _, _, pred_upper_bands, pred_lower_bands = TradingUtils.calculate_bollinger_bands_for_percentages(predicted_percentage_increases)
+        base_mas, base_stds, base_upper_bands, base_lower_bands = TradingUtils.calculate_bollinger_bands(base_pct_incs)
+        pred_mas, pred_stds, pred_upper_bands, pred_lower_bands = TradingUtils.calculate_bollinger_bands(pred_pct_incs)
 
-        for i in range(1, len(actual_rates_train) - 1):
-            curr_ratio = actual_rates_train[i]
-            actual_next_ratio = actual_rates_train[i + 1]
+        for i in range(1, len(actual_rates)-1):
+            # Continuous features
+            # feature = [
+            #     base_pct_incs[i],
+            #     pred_pct_incs[i],
+            #     (base_pct_incs[i] - base_mas[i]) / (base_stds[i] + 1e-9),   # price z
+            #     (pred_pct_incs[i] - pred_mas[i]) / (pred_stds[i] + 1e-9),   # pred z
+            #     base_upper_bands[i] - base_pct_incs[i], base_pct_incs[i] - base_lower_bands[i],   # distances to bands
+            #     pred_upper_bands[i] - pred_pct_incs[i], pred_pct_incs[i] - pred_lower_bands[i],
+            #     base_stds[i],                   # 20-lag vol
+            #     pred_stds[i],
+            #     base_mas[i],                   # short momentum
+            #     pred_mas[i],
+            #     # add spread/fee proxies, TOD dummies, etc.
+            # ]
+            feature = [
+                self.label_mapping["buy_currency_a"] if base_pct_incs[i] < 0 else self.label_mapping["sell_currency_a"] if base_pct_incs[i] > 0 else self.label_mapping["no_trade"],
+                self.label_mapping["buy_currency_a"] if pred_pct_incs[i] > 0 else self.label_mapping["sell_currency_a"] if pred_pct_incs[i] < 0 else self.label_mapping["no_trade"],
+            ]
+            X.append(feature)
 
-            base_percentage_increase = base_percentage_increases[i]
-            predicted_percentage_increase = predicted_percentage_increases[i]
-            base_lower_threshold = base_lower_bands[i]
-            base_upper_threshold = base_upper_bands[i]
-            pred_lower_threshold = pred_lower_bands[i]
-            pred_upper_threshold = pred_upper_bands[i]
+            # Direction label by next price (or use triple-barrier—recommended)
+            y.append(self.label_mapping["buy_currency_a"] if actual_rates[i+1] > actual_rates[i] 
+                     else self.label_mapping["sell_currency_a"] if actual_rates[i+1] < actual_rates[i] 
+                     else self.label_mapping["no_trade"])
 
-            # Generate predictions for all base strategies
-            predicted_trades = []
-            for strategy in ['mean_reversion', 'pure_forcasting']:
-                trade_direction = self.determine_trade_direction(
-                    strategy, base_percentage_increase, predicted_percentage_increase, 
-                    base_lower_threshold, base_upper_threshold, pred_lower_threshold, pred_upper_threshold, 0
-                )
-                predicted_trades.append(self.label_mapping[trade_direction])
-
-            # Determine correct trade direction
-            correct_trade_direction = self.label_mapping["no_trade"]
-            if actual_next_ratio > curr_ratio:
-                correct_trade_direction = self.label_mapping["buy_currency_a"]
-            elif actual_next_ratio < curr_ratio:
-                correct_trade_direction = self.label_mapping["sell_currency_a"]
-
-            historical_data.append((predicted_trades, correct_trade_direction))
-
-        return historical_data
+        return list(zip(X, y))
         
-    def _execute_trading_strategy(self, strategy_name, actual_rates, predicted_rates, bid_prices, ask_prices, 
+    def _execute_trading_strategy(self, strategy_name, actual_rates, pred_rates, bid_prices, ask_prices, 
                                  use_kelly, enable_transaction_costs, hold_position):
         """Helper method to execute trading for a specific strategy."""
-        base_percentage_increases, predicted_percentage_increases = TradingUtils.calculate_percentage_increases(
-            actual_rates, predicted_rates
-        )
+        base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
         
         # Calculate Bollinger bands
-        _, _, base_upper_bands, base_lower_bands = TradingUtils.calculate_bollinger_bands_for_percentages(base_percentage_increases)
-        _, _, pred_upper_bands, pred_lower_bands = TradingUtils.calculate_bollinger_bands_for_percentages(predicted_percentage_increases)
+        _, _, base_upper_bands, base_lower_bands = TradingUtils.calculate_bollinger_bands(base_pct_incs)
+        _, _, pred_upper_bands, pred_lower_bands = TradingUtils.calculate_bollinger_bands(pred_pct_incs)
         
         for i in range(1, len(actual_rates) - 1):
             curr_bid_price = bid_prices[i]
             curr_ask_price = ask_prices[i]
 
-            base_percentage_increase = base_percentage_increases[i]
-            predicted_percentage_increase = predicted_percentage_increases[i]
-            base_lower_threshold = base_lower_bands[i]
-            base_upper_threshold = base_upper_bands[i]
-            pred_lower_threshold = pred_lower_bands[i]
-            pred_upper_threshold = pred_upper_bands[i]
+            base_pct_inc = base_pct_incs[i]
+            pred_pct_inc = pred_pct_incs[i]
+            base_lower_band = base_lower_bands[i]
+            base_upper_band = base_upper_bands[i]
+            pred_lower_band = pred_lower_bands[i]
+            pred_upper_band = pred_upper_bands[i]
 
             # Calculate Kelly fraction
             f_i = self.kelly_criterion(strategy_name)
             
             # Determine trade direction
             trade_direction = self.determine_trade_direction(
-                strategy_name, base_percentage_increase, predicted_percentage_increase,
-                base_lower_threshold, base_upper_threshold, pred_lower_threshold, pred_upper_threshold, 0
+                strategy_name, base_pct_inc, pred_pct_inc, base_lower_band, 
+                base_upper_band, pred_lower_band, pred_upper_band, 0
             )
 
             # Execute trade and calculate profit
@@ -399,54 +461,59 @@ class TradingStrategy():
 
             # Update tracking variables
             self._update_strategy_metrics(strategy_name, profit)
-        
-    def _execute_ensemble_strategy(self, actual_rates_test, predicted_rates_test, bid_prices_test, 
-                                  ask_prices_test, use_kelly, enable_transaction_costs, hold_position):
+
+    def _execute_ensemble_strategy(self, actual_rates, pred_rates, bid_prices, ask_prices, use_kelly, enable_transaction_costs, hold_position, min_conf=0.0):
         """Helper method to execute ensemble trading strategy."""
         strategy_name = "ensemble"
-        base_percentage_increases, predicted_percentage_increases = TradingUtils.calculate_percentage_increases(
-            actual_rates_test, predicted_rates_test
-        )
-        
-        # Use pre-calculated bands from training (simplified for this example)
-        _, _, base_upper_bands, base_lower_bands = TradingUtils.calculate_bollinger_bands_for_percentages(base_percentage_increases)
-        _, _, pred_upper_bands, pred_lower_bands = TradingUtils.calculate_bollinger_bands_for_percentages(predicted_percentage_increases)
+        base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
+        # Bollinger on base & pred pct
+        base_mas, base_stds, base_upper_bands, base_lower_bands = TradingUtils.calculate_bollinger_bands(base_pct_incs)
+        pred_mas, pred_stds, pred_upper_bands, pred_lower_bands = TradingUtils.calculate_bollinger_bands(pred_pct_incs)
 
-        for i in range(1, len(actual_rates_test) - 1):
-            curr_bid_price = bid_prices_test[i]
-            curr_ask_price = ask_prices_test[i]
+        classes = [0, 1, 2]
 
-            base_percentage_increase = base_percentage_increases[i]
-            predicted_percentage_increase = predicted_percentage_increases[i]
-            base_lower_threshold = base_lower_bands[i]
-            base_upper_threshold = base_upper_bands[i]
-            pred_lower_threshold = pred_lower_bands[i]
-            pred_upper_threshold = pred_upper_bands[i]
-
-            # Generate predictions for all base strategies
-            predicted_trades = []
-            for strategy in ['mean_reversion', 'pure_forcasting']:
-                trade_direction = self.determine_trade_direction(
-                    strategy, base_percentage_increase, predicted_percentage_increase,
-                    base_lower_threshold, base_upper_threshold, pred_lower_threshold, pred_upper_threshold, 0
-                )
-                predicted_trades.append(self.label_mapping[trade_direction])
+        for i in range(1, len(actual_rates) - 1):
+            # Continuous features
+            # feature = [
+            #     base_pct_incs[i],
+            #     pred_pct_incs[i],
+            #     (base_pct_incs[i]-base_mas[i]) / (base_stds[i]+1e-9),   # price z
+            #     (pred_pct_incs[i]-pred_mas[i]) / (pred_stds[i]+1e-9),   # pred z
+            #     base_upper_bands[i]-base_pct_incs[i], base_pct_incs[i]-base_lower_bands[i],   # distances to bands
+            #     pred_upper_bands[i]-pred_pct_incs[i], pred_pct_incs[i]-pred_lower_bands[i],
+            #     base_stds[i],                   # 20-lag vol
+            #     pred_stds[i],
+            #     base_mas[i],                   # short momentum
+            #     pred_mas[i],
+            #     # add spread/fee proxies, TOD dummies, etc.
+            # ]
+            feature = [
+                self.label_mapping["buy_currency_a"] if base_pct_incs[i] < 0 else self.label_mapping["sell_currency_a"] if base_pct_incs[i] > 0 else self.label_mapping["no_trade"],
+                self.label_mapping["buy_currency_a"] if pred_pct_incs[i] > 0 else self.label_mapping["sell_currency_a"] if pred_pct_incs[i] < 0 else self.label_mapping["no_trade"],
+            ]
 
             # Get ensemble prediction
-            if self.default_ensemble_prediction is not None:
-                predicted_trade_direction = self.default_ensemble_prediction
+            if self.default_ensemble_pred is not None:
+                pred_trade_direction = self.default_ensemble_pred
             else:
-                feature_vector = np.array(predicted_trades).reshape(1, -1)
-                # feature_vector = self.ensemble_scaler.transform(feature_vector)
-                predicted_trade_direction = self.ensemble_model.predict(feature_vector)[0]
+                feature_vector = np.array(feature).reshape(1, -1)
+                pred_probs = self.ensemble_model.predict_proba(feature_vector)[0]
+                pred_best_idx = int(np.argmax(pred_probs))
+                pred_best_prob = float(pred_probs[pred_best_idx])
+                pred_trade_direction = int(classes[pred_best_idx])
 
             # Convert to trade direction
-            if predicted_trade_direction == self.label_mapping["buy_currency_a"]:
+            if pred_best_prob < min_conf:
+                trade_direction = 'no_trade'
+            elif pred_trade_direction == self.label_mapping["buy_currency_a"]:
                 trade_direction = 'buy_currency_a'
-            elif predicted_trade_direction == self.label_mapping["sell_currency_a"]:
+            elif pred_trade_direction == self.label_mapping["sell_currency_a"]:
                 trade_direction = 'sell_currency_a'
             else:
                 trade_direction = 'no_trade'
+
+            curr_bid_price = bid_prices[i]
+            curr_ask_price = ask_prices[i]
 
             # Calculate Kelly fraction and execute trade
             f_i = self.kelly_criterion(strategy_name)
@@ -484,7 +551,7 @@ class TradingStrategy():
                 self.total_profit_or_loss[strategy_name] += profit
                 self.trade_returns[strategy_name].append(profit)
 
-    def simulate_trading_with_strategies(self, actual_rates, predicted_rates, bid_prices, ask_prices, llm_sentiments, use_kelly=True, enable_transaction_costs=False, hold_position=False):
+    def simulate_trading_with_strategies(self, actual_rates, pred_rates, bid_prices, ask_prices, llm_sentiments, use_kelly=True, enable_transaction_costs=False, hold_position=False):
         """Simulate trading over a series of exchange rates using different strategies."""
 
         strategy_name = "ensemble"
@@ -493,30 +560,30 @@ class TradingStrategy():
         split_idx = len(actual_rates) // 2
         
         actual_rates_train = actual_rates[:split_idx]
-        predicted_rates_train = predicted_rates[:split_idx]
+        pred_rates_train = pred_rates[:split_idx]
         llm_sentiments_train = llm_sentiments[:split_idx]
         
         actual_rates_test = actual_rates[split_idx:]
-        predicted_rates_test = predicted_rates[split_idx:]
+        pred_rates_test = pred_rates[split_idx:]
         bid_prices_test = bid_prices[split_idx:]
         ask_prices_test = ask_prices[split_idx:]
         llm_sentiments_test = llm_sentiments[split_idx:]
 
         # Phase 2: Train ensemble model
         print("Training ensemble model...")
-        historical_data = self._generate_training_data(actual_rates_train, predicted_rates_train, llm_sentiments_train)
+        historical_data = self._generate_training_data(actual_rates_train, pred_rates_train, llm_sentiments_train)
         print(f"Length of historical_data: {len(historical_data)}")
         self.train_ensemble_model(historical_data)
 
         # Phase 3: Execute trading strategies
         print("Executing ensemble strategy...")
-        self._execute_ensemble_strategy(actual_rates_test, predicted_rates_test, bid_prices_test, 
+        self._execute_ensemble_strategy(actual_rates_test, pred_rates_test, bid_prices_test, 
                                        ask_prices_test, use_kelly, enable_transaction_costs, hold_position)
         
         print("Executing base strategies...")
         base_strategy_names = ['mean_reversion', 'trend', 'pure_forcasting', 'hybrid_mean_reversion', 'hybrid_trend']
         for strategy_name in base_strategy_names:
-            self._execute_trading_strategy(strategy_name, actual_rates_test, predicted_rates_test, 
+            self._execute_trading_strategy(strategy_name, actual_rates_test, pred_rates_test, 
                                          bid_prices_test, ask_prices_test, use_kelly, enable_transaction_costs, hold_position)
             
          # Phase 4: Close remaining positions and calculate results
