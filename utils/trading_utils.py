@@ -4,9 +4,9 @@ class TradingUtils:
     """Utility class for trading strategies."""
 
     @staticmethod
-    def calculate_bollinger_bands_for_percentages(percentage_values, window=20, std_dev=2):
+    def calculate_bollinger_bands(pct_values, window=20, std_dev=2):
         """Calculate Bollinger bands for percentage increase values."""
-        n = len(percentage_values)
+        n = len(pct_values)
         ma = []
         std = []
         upper_band = []
@@ -15,7 +15,7 @@ class TradingUtils:
         for i in range(n):
             # Use all available data up to the window size
             start_idx = max(0, i - (window - 1))
-            window_data = percentage_values[start_idx:i+1]
+            window_data = pct_values[start_idx:i+1]
             actual_window = len(window_data)
             
             # Calculate moving average
@@ -44,29 +44,29 @@ class TradingUtils:
         return ma, std, upper_band, lower_band
         
     @staticmethod
-    def calculate_percentage_increases(actual_rates, predicted_rates):
+    def calculate_pct_inc(actual_rates, pred_rates):
         """Calculate percentage increases for Bollinger bands."""
-        base_percentage_increases = [0.0]
-        predicted_percentage_increases = [0.0]
+        base_pct_incs = [0.0]
+        pred_pct_incs = [0.0]
         
         for i in range(1, len(actual_rates) - 1):
             curr_ratio = actual_rates[i]
             prev_ratio = actual_rates[i - 1]
-            predicted_ratio = predicted_rates[i + 1]
+            pred_ratio = pred_rates[i + 1]
             
             # Avoid division by zero
             if prev_ratio != 0 and curr_ratio != 0:
-                base_percentage_increase = ((curr_ratio - prev_ratio) / prev_ratio) * 100
-                predicted_percentage_increase = ((predicted_ratio - curr_ratio) / curr_ratio) * 100
+                base_pct_inc = ((curr_ratio - prev_ratio) / prev_ratio) * 100
+                pred_pct_inc = ((pred_ratio - curr_ratio) / curr_ratio) * 100
             else:
                 print(f"Division by zero at index {i}")
-                base_percentage_increase = 0.0
-                predicted_percentage_increase = 0.0
+                base_pct_inc = 0.0
+                pred_pct_inc = 0.0
                 
-            base_percentage_increases.append(base_percentage_increase)
-            predicted_percentage_increases.append(predicted_percentage_increase)
+            base_pct_incs.append(base_pct_inc)
+            pred_pct_incs.append(pred_pct_inc)
             
-        return base_percentage_increases, predicted_percentage_increases
+        return base_pct_incs, pred_pct_incs
         
     @staticmethod
     def calculate_sharpe_ratio(trade_returns, risk_free_rate=0.0):
