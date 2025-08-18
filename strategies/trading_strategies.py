@@ -39,6 +39,7 @@ class TradingStrategy():
 
         self.min_trades_for_full_kelly = 30  # Minimum trades before using full Kelly
         self.fixed_position_size = 1000  # Fixed position size for training
+        self.kelly_fraction = 0.5 # Fraction of Kelly to use
         
         # Initialize XGBoost models with appropriate parameters
         self.ensemble_model = XGBClassifier(
@@ -96,7 +97,7 @@ class TradingStrategy():
 
         f = win_prob - ((1 - win_prob) / win_loss_ratio) # Basic Kelly calculation
         f = max(0.01, f) # Ensure kelly is non-negative
-        f *= 0.5 # Fractional Kelly
+        f *= self.kelly_fraction # Fractional Kelly
 
         return f
 
