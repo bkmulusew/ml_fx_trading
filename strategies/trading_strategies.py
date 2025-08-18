@@ -114,7 +114,7 @@ class TradingStrategy():
         # Return bounded result
         return max(0.01, min(0.25, kelly))
 
-    def calculate_profit(self, strategy_name, trade_direction, bid_price, ask_price, f_i, use_kelly, enable_transaction_costs, hold_position):
+    def execute_trade(self, strategy_name, trade_direction, bid_price, ask_price, f_i, use_kelly, enable_transaction_costs, hold_position):
         """Calculate profit/loss and handle position management"""
         # Determine pricing based on transaction costs setting
         if enable_transaction_costs:
@@ -123,24 +123,22 @@ class TradingStrategy():
         else:
             mid_price = (bid_price + ask_price) / 2
             buy_price = sell_price = mid_price
-
-        profit_in_base_curr = 0.0
         
         # Check if there's an open position
         if self.open_positions[strategy_name]['type'] is not None:
-            if(hold_position):
+            if hold_position:
                 # If new trade direction is different from current position type, close the position
-                current_position_type = 'long' if self.open_positions[strategy_name]['type'] == 'long' else 'short'
+                current_position_type = self.open_positions[strategy_name]['type']
                 new_position_type = 'long' if trade_direction == 'buy_currency_a' else 'short' if trade_direction == 'sell_currency_a' else None
                 
                 if new_position_type is not None and new_position_type != current_position_type:
-                    profit_in_base_curr += self.close_position(strategy_name, sell_price, buy_price)
+                    self.close_position(strategy_name, sell_price, buy_price)
                 else:
                     # If same type or no trade, don't make a new trade
-                    return profit_in_base_curr
+                    return
             else:
                 # If hold position is not enabled, close the position
-                profit_in_base_curr += self.close_position(strategy_name, sell_price, buy_price)
+                self.close_position(strategy_name, sell_price, buy_price)
         
         # Then open new position if there's a trade signal and no matching position type
         if trade_direction != 'no_trade':
@@ -153,7 +151,7 @@ class TradingStrategy():
                 base_bet_size_a = self.fixed_position_size
             
             if trade_direction == 'buy_currency_a':
-                bet_size_a = min(base_bet_size_a, self.wallet_a[strategy_name])
+                bet_size_a = min(base_bet_size_a, self.wallet_b[strategy_name] / buy_price)
                 bet_size_b = bet_size_a * buy_price
                 
                 # Check if we have enough B
@@ -182,37 +180,48 @@ class TradingStrategy():
                         'size_b': bet_size_b,
                         'entry_ratio': sell_price
                     }
-        
-        return profit_in_base_curr
     
     def close_position(self, strategy_name, sell_price, buy_price):
         """Close an open position and calculate profit/loss"""
         position = self.open_positions[strategy_name]
-        profit_in_base_curr = 0.0
+        profit_in_curr_b = 0.0
         
         if position['type'] == 'long':
-            # Close long position (sell currency A)
-            # Entry: BUY at ASK (entry_ratio)
-            # Exit: SELL at BID
+            # Close long position: sell currency A for currency B
             exit_amount_b = position['size_a'] * sell_price
+
+            # Calculate profit in currency B terms
+            profit_in_curr_b = exit_amount_b - position['size_b']  # What we got vs what we paid
+    
+            # Update wallets
             self.wallet_a[strategy_name] -= position['size_a']
             self.wallet_b[strategy_name] += exit_amount_b
-            profit_in_base_curr = position['size_a'] * (sell_price - position['entry_ratio']) / buy_price
             
         elif position['type'] == 'short':
-            # Close short position (buy currency A)
-            # Entry: SELL at BID (entry_ratio)
-            # Exit: BUY at ASK
-            exit_amount_a = position['size_b'] / buy_price
-            self.wallet_b[strategy_name] -= position['size_b']
-            self.wallet_a[strategy_name] += exit_amount_a
-            profit_in_base_curr = position['size_a'] * (position['entry_ratio'] - buy_price) / buy_price
+            # Close short position: buy back currency A with currency B
+            cost_to_buyback_a = position['size_a'] * buy_price
+            
+            # Calculate profit in currency B terms
+            profit_in_curr_b = position['size_b'] - cost_to_buyback_a
+            
+            # Update wallets
+            self.wallet_b[strategy_name] -= cost_to_buyback_a
+            self.wallet_a[strategy_name] += position['size_a']
         
         # Reset position tracking
         self.open_positions[strategy_name] = {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0}
+
+        # Update profit tracking
         self.num_trades[strategy_name] += 1
-        
-        return profit_in_base_curr
+        self.total_profit_or_loss[strategy_name] += profit_in_curr_b
+        self.trade_returns[strategy_name].append(profit_in_curr_b)
+
+        if profit_in_curr_b > 0:
+            self.num_wins[strategy_name] += 1
+            self.total_gains[strategy_name] += profit_in_curr_b
+        elif profit_in_curr_b < 0:
+            self.num_losses[strategy_name] += 1
+            self.total_losses[strategy_name] += abs(profit_in_curr_b)
 
     # def determine_trade_direction(self, strategy_name, base_pct_change, pred_pct_change, base_lower_band, 
     #                               base_upper_band, pred_lower_band, pred_upper_band, llm_sentiment):
@@ -455,12 +464,9 @@ class TradingStrategy():
                 base_upper_band, pred_lower_band, pred_upper_band, 0
             )
 
-            # Execute trade and calculate profit
-            profit = self.calculate_profit(strategy_name, trade_direction, curr_bid_price, curr_ask_price, 
+            # Execute trade
+            self.execute_trade(strategy_name, trade_direction, curr_bid_price, curr_ask_price, 
                                          f_i, use_kelly, enable_transaction_costs, hold_position)
-
-            # Update tracking variables
-            self._update_strategy_metrics(strategy_name, profit)
 
     def _execute_ensemble_strategy(self, actual_rates, pred_rates, bid_prices, ask_prices, use_kelly, enable_transaction_costs, hold_position, min_conf=0.0):
         """Helper method to execute ensemble trading strategy."""
@@ -517,24 +523,8 @@ class TradingStrategy():
 
             # Calculate Kelly fraction and execute trade
             f_i = self.kelly_criterion(strategy_name)
-            profit = self.calculate_profit(strategy_name, trade_direction, curr_bid_price, curr_ask_price, 
+            self.execute_trade(strategy_name, trade_direction, curr_bid_price, curr_ask_price, 
                                          f_i, use_kelly, enable_transaction_costs, hold_position)
-            
-            # Update tracking variables
-            self._update_strategy_metrics(strategy_name, profit)
-        
-    def _update_strategy_metrics(self, strategy_name, profit):
-        """Helper method to update strategy performance metrics."""
-        self.total_profit_or_loss[strategy_name] += profit
-        self.trade_returns[strategy_name].append(profit)
-
-        # Update win/loss counters and totals
-        if profit > 0:
-            self.num_wins[strategy_name] += 1
-            self.total_gains[strategy_name] += abs(profit)
-        elif profit < 0:
-            self.num_losses[strategy_name] += 1
-            self.total_losses[strategy_name] += abs(profit)
         
     def _close_all_remaining_positions(self, strategy_names, bid_prices, ask_prices, enable_transaction_costs):
         """Helper method to close any remaining open positions for all strategies."""
@@ -547,9 +537,7 @@ class TradingStrategy():
                     mid_price = (sell_price + buy_price) / 2
                     buy_price = sell_price = mid_price
                     
-                profit = self.close_position(strategy_name, sell_price, buy_price)
-                self.total_profit_or_loss[strategy_name] += profit
-                self.trade_returns[strategy_name].append(profit)
+                self.close_position(strategy_name, sell_price, buy_price)
 
     def simulate_trading_with_strategies(self, actual_rates, pred_rates, bid_prices, ask_prices, llm_sentiments, use_kelly=True, enable_transaction_costs=False, hold_position=False):
         """Simulate trading over a series of exchange rates using different strategies."""
