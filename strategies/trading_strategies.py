@@ -37,7 +37,7 @@ class TradingStrategy():
             'ensemble': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
         }
 
-        self.min_trades_for_full_kelly = 50  # Minimum trades before using full Kelly
+        self.min_trades_for_full_kelly = 30  # Minimum trades before using full Kelly
         self.fixed_position_size = 1000  # Fixed position size for training
         
         # Initialize XGBoost models with appropriate parameters
@@ -66,53 +66,39 @@ class TradingStrategy():
         """Calculate the win/loss ratio for a strategy with basic smoothing."""
         total_trades = self.num_wins[strategy_name] + self.num_losses[strategy_name]
         
-        if total_trades == 0:
-            return 1.5  # Conservative default
-            
-        # Use consistent scaling factor
-        confidence = min(1.0, total_trades / self.min_trades_for_full_kelly)
-        smoothing = max(0.1, 1.0 - confidence)
+        if total_trades < self.min_trades_for_full_kelly:
+            return 1.05  # Conservative default
         
         # Calculate averages with basic error handling
         avg_gain = (self.total_gains[strategy_name] / self.num_wins[strategy_name]) if self.num_wins[strategy_name] else 1.0
         avg_loss = (self.total_losses[strategy_name] / self.num_losses[strategy_name]) if self.num_losses[strategy_name] else 1.0
-        
-        # Apply smoothing and return with floor
-        return max(0.1, (avg_gain + smoothing) / (avg_loss + smoothing))
+        win_loss_ratio = avg_gain / avg_loss
+
+        return win_loss_ratio
 
     def win_probability(self, strategy_name):
         """Calculate win probability with basic statistical adjustment."""
         total_trades = self.num_wins[strategy_name] + self.num_losses[strategy_name]
         
-        if total_trades == 0:
-            return 0.5  # Neutral default
+        if total_trades < self.min_trades_for_full_kelly:
+            return 0.5  # Conservative default
             
-        # Basic win rate
+        # Calculate win rate
         win_rate = self.num_wins[strategy_name] / total_trades
         
-        # Use consistent scaling
-        confidence = min(1.0, total_trades / self.min_trades_for_full_kelly)
-        adjusted_rate = (win_rate * confidence) + (0.5 * (1 - confidence))
-        
-        # Keep within reasonable bounds
-        return max(0.1, min(0.9, adjusted_rate))
+        return win_rate
 
     def kelly_criterion(self, strategy_name):
         """Calculate Kelly fraction with basic risk controls."""
         # Get core metrics
         win_prob = self.win_probability(strategy_name)
         win_loss_ratio = self.win_loss_ratio(strategy_name)
-        total_trades = self.num_wins[strategy_name] + self.num_losses[strategy_name]
 
-        # Basic Kelly calculation
-        kelly = win_prob - ((1 - win_prob) / win_loss_ratio)
+        f = win_prob - ((1 - win_prob) / win_loss_ratio) # Basic Kelly calculation
+        f = max(0.01, f) # Ensure kelly is non-negative
+        f *= 0.5 # Fractional Kelly
 
-        # Single confidence adjustment based on trade count
-        confidence = min(1.0, total_trades / self.min_trades_for_full_kelly)
-        kelly *= confidence
-
-        # Return bounded result
-        return max(0.01, min(0.25, kelly))
+        return f
 
     def execute_trade(self, strategy_name, trade_direction, bid_price, ask_price, f_i, use_kelly, enable_transaction_costs, hold_position):
         """Calculate profit/loss and handle position management"""
@@ -165,6 +151,8 @@ class TradingStrategy():
                         'size_b': bet_size_b,
                         'entry_ratio': buy_price
                     }
+                else:
+                    print(f"Not enough B to buy {bet_size_a} currency A")
 
             elif trade_direction == 'sell_currency_a':
                 bet_size_a = min(base_bet_size_a, self.wallet_a[strategy_name])
@@ -180,6 +168,8 @@ class TradingStrategy():
                         'size_b': bet_size_b,
                         'entry_ratio': sell_price
                     }
+                else:
+                    print(f"Not enough A to sell {bet_size_a} currency A")
     
     def close_position(self, strategy_name, sell_price, buy_price):
         """Close an open position and calculate profit/loss"""

@@ -481,8 +481,8 @@ def print_model_config(config):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--wallet_a", type=float, default=5487000.0, help="Amount of money in wallet A (currency A).")
-    parser.add_argument("--wallet_b", type=float, default=1000000.0, help="Amount of money in wallet B (currency B).")
+    parser.add_argument("--wallet_a", type=float, default=100000.0, help="Amount of money in wallet A (currency A).")
+    parser.add_argument("--wallet_b", type=float, default=100000.0, help="Amount of money in wallet B (currency B).")
     parser.add_argument(
         "--model_name",
         type=str,
