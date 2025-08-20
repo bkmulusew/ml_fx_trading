@@ -11,7 +11,7 @@ from collections import defaultdict
 from datetime import datetime
 import matplotlib.pyplot as plt
 
-def plot_prediction_comparison(true_values, predicted_values, model_config):
+def plot_prediction_comparison(true_values, predicted_values, model_config, price_type):
     """Plot true vs predicted values and save the figure."""
     plt.plot(true_values, color='blue', label='True')
     plt.plot(predicted_values, color='red', label=f'{model_config.MODEL_NAME} Prediction')
@@ -19,32 +19,36 @@ def plot_prediction_comparison(true_values, predicted_values, model_config):
     plt.xlabel('Observations')
     plt.ylabel('Ratio')
     plt.legend()
-    plt.savefig(f'{model_config.OUTPUT_DIR}/true_vs_predicted_{model_config.MODEL_NAME}.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'{model_config.OUTPUT_DIR}/true_vs_predicted_{model_config.MODEL_NAME}_{price_type}.png', dpi=300, bbox_inches='tight')
     plt.clf()
 
-def group_data_by_date(dates, true_values, predicted_values, bid_prices, ask_prices, with_prompt_values, without_prompt_values):
+def group_data_by_date(dates, pred_mid_values, pred_bid_values, pred_ask_values, true_mid_values, true_bid_values, true_ask_values, with_prompt_values, without_prompt_values):
     """Group all test data by date for trading simulation."""
     # Parse test_dates into datetime objects
     
     # Create a dictionary to group values by date
     chunked_values = defaultdict(lambda: {
-        "true_values": [], 
-        "predicted_values": [],
-        "bid_price": [], 
-        "ask_price": [], 
+        "pred_mid_values": [],
+        "pred_bid_values": [],
+        "pred_ask_values": [],
+        "true_mid_values": [], 
+        "true_bid_values": [], 
+        "true_ask_values": [], 
         "with_prompt": [], 
         "without_prompt": []
     })
     
     # Chunk data by date
-    for date, true_val, pred_val, bid_price, ask_price, with_prompt_val, without_prompt_val in zip(
-            dates, true_values, predicted_values, bid_prices, ask_prices, with_prompt_values, without_prompt_values
+    for date, pred_mid_val, pred_bid_val, pred_ask_val, true_mid_val, true_bid_val, true_ask_val, with_prompt_val, without_prompt_val in zip(
+            dates, pred_mid_values, pred_bid_values, pred_ask_values, true_mid_values, true_bid_values, true_ask_values, with_prompt_values, without_prompt_values
         ):
         date_key = date.date()  # Use only the date part as the key
-        chunked_values[date_key]["true_values"].append(true_val)
-        chunked_values[date_key]["predicted_values"].append(pred_val)
-        chunked_values[date_key]["bid_price"].append(bid_price)
-        chunked_values[date_key]["ask_price"].append(ask_price)
+        chunked_values[date_key]["pred_mid_values"].append(pred_mid_val)
+        chunked_values[date_key]["pred_bid_values"].append(pred_bid_val)
+        chunked_values[date_key]["pred_ask_values"].append(pred_ask_val)
+        chunked_values[date_key]["true_mid_values"].append(true_mid_val)
+        chunked_values[date_key]["true_bid_values"].append(true_bid_val)
+        chunked_values[date_key]["true_ask_values"].append(true_ask_val)
         chunked_values[date_key]["with_prompt"].append(with_prompt_val)
         chunked_values[date_key]["without_prompt"].append(without_prompt_val)
     
@@ -69,9 +73,14 @@ def run_sl_based_trading_strategy(model_config):
         true_values = generated_values['true_values']
     elif model_config.MODEL_NAME == 'toto':
         predictor = TotoFinancialForecastingModel(dataProcessor, model_config)
-        _, _, test_series, test_dates, test_bid_prices, test_ask_prices, test_with_prompt, test_without_prompt = predictor.split_and_scale_data()
-        predicted_values = predictor.generate_predictions(test_series)
-        true_values = predictor.get_true_values(test_series)
+        X_test_scaled, test_dates, test_with_prompt, test_without_prompt = predictor.split_and_scale_data()
+        pred_mid_values, pred_bid_values, pred_ask_values, _ = predictor.generate_predictions(X_test_scaled)
+        # Count how many times ask <= bid
+        violations = sum(1 for a, b in zip(pred_ask_values, pred_bid_values) if a <= b)
+        print(f"Number of cases where predicted ask price is not greater than bid price: {violations} out of {len(pred_ask_values)}")
+        true_mid_values = predictor.test_mid_prices[model_config.INPUT_CHUNK_LENGTH:].tolist()
+        true_bid_values = predictor.test_bid_prices[model_config.INPUT_CHUNK_LENGTH:].tolist()
+        true_ask_values = predictor.test_ask_prices[model_config.INPUT_CHUNK_LENGTH:].tolist()
     else:
         predictor = DartsFinancialForecastingModel(dataProcessor, model_config)
         train_series, valid_series, test_series, test_dates, test_bid_prices, test_ask_prices, test_with_prompt, test_without_prompt = predictor.split_and_scale_data()
@@ -81,21 +90,29 @@ def run_sl_based_trading_strategy(model_config):
 
     # Calculate and print the prediction error.
     print(f"Model: {model_config.MODEL_NAME}")
-    prediction_error_model = eval_metrics.calculate_prediction_error(predicted_values, true_values)
-    print(f"Prediction Error for {model_config.MODEL_NAME}: {prediction_error_model}")
+    prediction_error_model_mid = eval_metrics.calculate_prediction_error(pred_mid_values, true_mid_values)
+    prediction_error_model_bid = eval_metrics.calculate_prediction_error(pred_bid_values, true_bid_values)
+    prediction_error_model_ask = eval_metrics.calculate_prediction_error(pred_ask_values, true_ask_values)
+    print(f"Prediction Error for {model_config.MODEL_NAME}: {prediction_error_model_mid}")
+    print(f"Prediction Error for {model_config.MODEL_NAME} Bid: {prediction_error_model_bid}")
+    print(f"Prediction Error for {model_config.MODEL_NAME} Ask: {prediction_error_model_ask}")
     print (f"\n")
 
-    plot_prediction_comparison(true_values, predicted_values, model_config)
+    plot_prediction_comparison(true_mid_values, pred_mid_values, model_config, 'mid')
+    plot_prediction_comparison(true_bid_values, pred_bid_values, model_config, 'bid')
+    plot_prediction_comparison(true_ask_values, pred_ask_values, model_config, 'ask')
 
     parsed_test_dates = [datetime.strptime(date, "%m/%d/%Y %H:%M") for date in test_dates]
 
     # Group data by date for trading simulation
     chunked_values = group_data_by_date(
         parsed_test_dates, 
-        true_values, 
-        predicted_values,
-        test_bid_prices, 
-        test_ask_prices,
+        pred_mid_values, 
+        pred_bid_values,
+        pred_ask_values,
+        true_mid_values, 
+        true_bid_values, 
+        true_ask_values,
         test_with_prompt, 
         test_without_prompt
     )
@@ -134,11 +151,11 @@ def run_sl_based_trading_strategy(model_config):
     ensemble_sharpe_ratios = []
 
     for _, values in chunked_values.items():
-        if (len(values['true_values']) < 7):
+        if (len(values['true_mid_values']) < 7):
             continue
 
         trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B)
-        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["with_prompt"], enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS, hold_position=model_config.HOLD_POSITION)
+        trading_strategy.simulate_trading_with_strategies(values['true_mid_values'], values['pred_mid_values'], values['true_bid_values'], values['true_ask_values'], values['pred_bid_values'], values['pred_ask_values'], values["with_prompt"], enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS, hold_position=model_config.HOLD_POSITION)
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
         forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])
@@ -304,11 +321,11 @@ def run_sl_based_trading_strategy(model_config):
     ensemble_sharpe_ratios = []
 
     for _, values in chunked_values.items():
-        if (len(values['true_values']) < 7):
+        if (len(values['true_mid_values']) < 7):
             continue
 
         trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B)
-        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["with_prompt"], use_kelly=False, enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS, hold_position=model_config.HOLD_POSITION)
+        trading_strategy.simulate_trading_with_strategies(values['true_mid_values'], values['pred_mid_values'], values['true_bid_values'], values['true_ask_values'], values['pred_bid_values'], values['pred_ask_values'], values["with_prompt"], use_kelly=False, enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS, hold_position=model_config.HOLD_POSITION)
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
         forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])
@@ -494,7 +511,7 @@ if __name__ == "__main__":
     parser.add_argument("--input_chunk_length", type=int, default=64, help="Length of the input sequences.")
     parser.add_argument("--output_chunk_length", type=int, default=1, help="Length of the output sequences.")
     parser.add_argument("--n_epochs", type=int, default=50, help="Number of training epochs.")
-    parser.add_argument("--batch_size", type=int, default=1024, help="Batch size for training.")
+    parser.add_argument("--batch_size", type=int, default=256, help="Batch size for training.")
     parser.add_argument("--train_ratio", type=float, default=0.5, help="Ratio of training data used in the train/test split.")
     parser.add_argument("--data_path", type=str, default="", help="Path to the training data. Currency rates should be provided as 1 A / 1 B, where A and B are the respective currencies.", required=True)
     parser.add_argument("--use_frac_kelly", action="store_true", help="Use fractional Kelly to size bets. Default is False.")

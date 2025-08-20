@@ -19,10 +19,12 @@ class DataProcessor:
         
         # Extract data into respective lists
         dates = df["date"].tolist()
-        bid_prices = df["bid_price"].tolist()
-        ask_prices = df["ask_price"].tolist()
+        bid_prices = df["bid_price"].values
+        ask_prices = df["ask_price"].values
         with_prompt_values = df["with_prompt"].tolist()
         without_prompt_values = df["without_prompt"].tolist()
+
+        spread = (ask_prices - bid_prices)
         
         if self.model_config.MODEL_NAME == 'toto':
             mid_price_series = df["mid_price"].values
@@ -33,6 +35,7 @@ class DataProcessor:
             dates,
             bid_prices,
             ask_prices,
+            spread,
             mid_price_series,
             with_prompt_values,
             without_prompt_values

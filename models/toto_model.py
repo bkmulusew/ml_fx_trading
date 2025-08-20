@@ -15,7 +15,8 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
     def __init__(self, data_processor, model_config):
         self.data_processor = data_processor
         self.model_config = model_config
-        self.scaler = MinMaxScaler(feature_range=(0, 1))
+        self.feature_order = ['mid', 'bid', 'ask', 'spread']
+        self.scalers = {name: MinMaxScaler(feature_range=(0, 1)) for name in self.feature_order}
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.forecaster = self.initialize_model()
 
@@ -48,52 +49,56 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
     def split_and_scale_data(self, train_ratio=0.5, validation_ratio=0.1):
         """Prepare data with proper train/test split and no data leakage"""
         # Extract raw data
-        dates, bid_prices, ask_prices, mid_prices, with_prompt_values, without_prompt_values = self.data_processor.extract_price_time_series()
+        dates, bid_prices, ask_prices, spread, mid_prices, with_prompt_values, without_prompt_values = self.data_processor.extract_price_time_series()
 
         # Calculate indices for splitting
-        num_observations = len(mid_prices)
-        train_end_index = int(num_observations * train_ratio)
-        validation_end_index = int(num_observations * (train_ratio + validation_ratio))
+        n = len(mid_prices)
+        train_end = int(n * train_ratio)
+        val_end = int(n * (train_ratio + validation_ratio))
 
-        # Split mid price series into train/validation/test
-        train_series, val_series, test_series = self._split_mid_price_series(mid_prices, train_end_index, validation_end_index)
+        # Split each series (keep unscaled copies for ground-truth later)
+        self.train_mid_prices, self.val_mid_prices, self.test_mid_prices = mid_prices[:train_end], mid_prices[train_end:val_end], mid_prices[val_end:]
+        self.train_bid_prices, self.val_bid_prices, self.test_bid_prices = bid_prices[:train_end], bid_prices[train_end:val_end], bid_prices[val_end:]
+        self.train_ask_prices, self.val_ask_prices, self.test_ask_prices = ask_prices[:train_end], ask_prices[train_end:val_end], ask_prices[val_end:]
+        self.train_spread, self.val_spread, self.test_spread = spread[:train_end], spread[train_end:val_end], spread[val_end:]
 
-        # Scale data
-        scaled_series = self._scale_series_data(train_series, val_series, test_series)
+        # Build matrices (T, C) in a fixed feature order
+        X_train = np.column_stack([
+            self.train_mid_prices, self.train_bid_prices, self.train_ask_prices, self.train_spread
+        ])
+        X_val = np.column_stack([
+            self.val_mid_prices, self.val_bid_prices, self.val_ask_prices, self.val_spread
+        ])
+        X_test = np.column_stack([
+            self.test_mid_prices, self.test_bid_prices, self.test_ask_prices, self.test_spread
+        ])
+
+        # Scale each column with its own scaler fit on TRAIN ONLY
+        X_train_scaled = X_train.copy().astype(np.float32) # (T_train, 4)
+        X_val_scaled   = X_val.copy().astype(np.float32)
+        X_test_scaled  = X_test.copy().astype(np.float32)
+
+        for j, name in enumerate(self.feature_order):
+            s = self.scalers[name]
+            X_train_scaled[:, j:j+1] = s.fit_transform(X_train[:, j:j+1])
+            X_val_scaled[:, j:j+1] = s.transform(X_val[:,j:j+1])
+            X_test_scaled[:, j:j+1] = s.transform(X_test[:, j:j+1])
 
         # Process test data
-        test_data = self._process_test_data(
-            dates=dates[validation_end_index:],
-            bid_prices=bid_prices[validation_end_index:],
-            ask_prices=ask_prices[validation_end_index:],
-            without_prompt=without_prompt_values[validation_end_index:],
-            with_prompt=with_prompt_values[validation_end_index:]
+        meta = self._align_test_targets(
+            dates=dates[val_end:],
+            without_prompt=without_prompt_values[val_end:],
+            with_prompt=with_prompt_values[val_end:]
         )
 
-        return (*scaled_series, *test_data)
+        return (X_test_scaled, *meta)
     
-    def _split_mid_price_series(self, mid_price, train_end, validation_end):
-        """Split the mid price series into train, validation, and test sets."""
-        return (
-            mid_price[:train_end],
-            mid_price[train_end:validation_end],
-            mid_price[validation_end:]
-        )
-    
-    def _process_test_data(self, **test_series):
+    def _align_test_targets(self, **test_series):
         """Process all test data series by applying the input chunk length offset."""
         return [
             series[self.model_config.INPUT_CHUNK_LENGTH:]
             for series in test_series.values()
         ]
-    
-    def _scale_series_data(self, train_series, val_series, test_series):
-        """Scale the series data using the Scaler."""
-        return (
-            self.scaler.fit_transform(train_series.reshape(-1, 1)).flatten(),
-            self.scaler.transform(val_series.reshape(-1, 1)).flatten(),
-            self.scaler.transform(test_series.reshape(-1, 1)).flatten()
-        )
 
     def train(self):
         """No training needed for zero-shot forecasting"""
@@ -102,13 +107,22 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
     def predict_future_values(self, input_sequences):
         """Make prediction for a batch of input sequences"""
 
-        # Convert to tensor (BATCH_SIZE, INPUT_CHUNK_LENGTH)
-        batch_tensor = torch.FloatTensor(input_sequences).to(self.device)
+        # input_sequences shape: (BATCH_SIZE, INPUT_CHUNK_LENGTH, 4)
+        batch_size, _, num_features = input_sequences.shape
 
+        # Toto expects (batch, variates, time_steps)
+        # Transpose from (batch, time_steps, features) to (batch, features, time_steps)
+        batch_tensor = torch.FloatTensor(input_sequences).transpose(1, 2).to(self.device)
+
+        # Create timestamp and time interval tensors
         timestamp_seconds = torch.zeros_like(batch_tensor).to(self.device)
-        time_interval_seconds = torch.full((batch_tensor.size(0),), TIME_INTERVAL_SECONDS, dtype=torch.float32).to(self.device)
+        time_interval_seconds = torch.full(
+            (batch_size, num_features), 
+            TIME_INTERVAL_SECONDS, 
+            dtype=torch.float32
+        ).to(self.device)
 
-        # Wrap in MaskedTimeseries
+        # Create MaskedTimeseries with multivariate input
         inputs = MaskedTimeseries(
             series=batch_tensor,
             padding_mask=torch.full_like(batch_tensor, True, dtype=torch.bool),
@@ -117,7 +131,6 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
             time_interval_seconds=time_interval_seconds,
         )
 
-        # Generate forecast
         with torch.no_grad():
             forecast = self.forecaster.forecast(
                 inputs,
@@ -127,54 +140,47 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
             )
 
         # Extract predictions using median for robustness
-        predictions = forecast.median.cpu().numpy().flatten()
-        return predictions.tolist()
+        # forecast.median shape: (batch, variates, prediction_length)
+        predictions = forecast.median.cpu().numpy()
+        
+        # Collect predictions in feature_order
+        out = [predictions[:, self.feature_order.index(name), 0] for name in self.feature_order]
+    
+        return tuple(out) # (mid_preds, bid_preds, ask_preds, spread_preds)
 
-    def generate_predictions(self, test_series):
+    def generate_predictions(self, data):
         """Generate predictions using sliding window with batching"""
 
+        # data shape: (time_steps, 4)
+        num_timesteps, _ = data.shape
+
         # Calculate how many predictions we can make
-        num_predictions = len(test_series) - self.model_config.INPUT_CHUNK_LENGTH
+        num_predictions = num_timesteps - self.model_config.INPUT_CHUNK_LENGTH
+
+        if num_predictions <= 0:
+            raise ValueError(f"Not enough data points. Need at least {self.model_config.INPUT_CHUNK_LENGTH + 1} timesteps, got {num_timesteps}")
         
-        # Generate predictions sequentially
-        scaled_predictions = []
+        # Allocate storage for each feature
+        all_preds = {name: np.empty(num_predictions, dtype=np.float32) for name in self.feature_order}
 
         for batch_idx in range(0, num_predictions, self.model_config.BATCH_SIZE):
             # Calculate batch boundaries
             batch_start = batch_idx
             batch_end = min(batch_idx + self.model_config.BATCH_SIZE, num_predictions)
-            batch_size_actual = batch_end - batch_start
 
             # Create batch of input sequences
-            batch_sequences = []
-
-            for pred_idx in range(batch_start, batch_end):
-                # Get the sequence for this prediction
-                start_idx = pred_idx
-                end_idx = pred_idx + self.model_config.INPUT_CHUNK_LENGTH
-                sequence = test_series[start_idx:end_idx]
-                batch_sequences.append(sequence)
-
-            # Convert to numpy array for batch processing
-            batch_input = np.array(batch_sequences, dtype=np.float32)
+            indices = np.arange(batch_start, batch_end)[:, None] + np.arange(self.model_config.INPUT_CHUNK_LENGTH)
+            batch_input = data[indices]  # Shape: (actual_batch_size, INPUT_CHUNK_LENGTH, num_features)
             
-            # Get predictions for this batch
-            batch_predictions = self.predict_future_values(batch_input)
+            preds = self.predict_future_values(batch_input)
             
-            # Validate prediction count matches expected batch size
-            if len(batch_predictions) != batch_size_actual:
-                print(f"Warning: Expected {batch_size_actual} predictions, got {len(batch_predictions)}")
-            
-            scaled_predictions.extend(batch_predictions)
+            for name, arr in zip(self.feature_order, preds):
+                all_preds[name][batch_start:batch_end] = arr
 
-        # Inverse transform and align metadata
-        predicted_values = self.scaler.inverse_transform(
-            np.array(scaled_predictions, dtype=np.float32).reshape(-1, 1)
-        ).flatten()
+        # Inverse transform
+        predicted_values = {}
+        for name in self.feature_order:
+            arr = all_preds[name].reshape(-1, 1)
+            predicted_values[name] = self.scalers[name].inverse_transform(arr).ravel().tolist()
 
-        return predicted_values.tolist()
-    
-    def get_true_values(self, test_series):
-        """Retrieves true values from the test series after scaling back."""
-        true_values = self.scaler.inverse_transform(test_series.reshape(-1, 1)).flatten()
-        return true_values[self.model_config.INPUT_CHUNK_LENGTH:].tolist()
+        return tuple(predicted_values[name] for name in self.feature_order)

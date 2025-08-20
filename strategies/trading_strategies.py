@@ -101,14 +101,14 @@ class TradingStrategy():
 
         return f
 
-    def execute_trade(self, strategy_name, trade_direction, bid_price, ask_price, f_i, use_kelly, enable_transaction_costs, hold_position):
+    def execute_trade(self, strategy_name, trade_direction, true_bid_price, true_ask_price, pred_bid_price, pred_ask_price, f_i, use_kelly, enable_transaction_costs, hold_position):
         """Calculate profit/loss and handle position management"""
         # Determine pricing based on transaction costs setting
         if enable_transaction_costs:
-            buy_price = ask_price
-            sell_price = bid_price
+            buy_price = true_ask_price
+            sell_price = true_bid_price
         else:
-            mid_price = (bid_price + ask_price) / 2
+            mid_price = (true_bid_price + true_ask_price) / 2
             buy_price = sell_price = mid_price
         
         # Check if there's an open position
@@ -119,13 +119,37 @@ class TradingStrategy():
                 new_position_type = 'long' if trade_direction == 'buy_currency_a' else 'short' if trade_direction == 'sell_currency_a' else None
                 
                 if new_position_type is not None and new_position_type != current_position_type:
-                    self.close_position(strategy_name, sell_price, buy_price)
+                    if enable_transaction_costs:
+                        if self.open_positions[strategy_name]['type'] == 'long':
+                            if true_bid_price > self.open_positions[strategy_name]['entry_ratio']:
+                                self.close_position(strategy_name, sell_price, buy_price)
+                            else:
+                                return
+                        elif self.open_positions[strategy_name]['type'] == 'short':
+                            if true_ask_price < self.open_positions[strategy_name]['entry_ratio']:
+                                self.close_position(strategy_name, sell_price, buy_price)
+                            else:
+                                return
+                    else:
+                        self.close_position(strategy_name, sell_price, buy_price)
                 else:
                     # If same type or no trade, don't make a new trade
                     return
             else:
                 # If hold position is not enabled, close the position
-                self.close_position(strategy_name, sell_price, buy_price)
+                if enable_transaction_costs:
+                    if self.open_positions[strategy_name]['type'] == 'long':
+                        if true_bid_price > self.open_positions[strategy_name]['entry_ratio']:
+                            self.close_position(strategy_name, sell_price, buy_price)
+                        else:
+                            return
+                    elif self.open_positions[strategy_name]['type'] == 'short':
+                        if true_ask_price < self.open_positions[strategy_name]['entry_ratio']:
+                            self.close_position(strategy_name, sell_price, buy_price)
+                        else:
+                            return
+                else:
+                    self.close_position(strategy_name, sell_price, buy_price)
         
         # Then open new position if there's a trade signal and no matching position type
         if trade_direction != 'no_trade':
@@ -213,49 +237,6 @@ class TradingStrategy():
         elif profit_in_curr_b < 0:
             self.num_losses[strategy_name] += 1
             self.total_losses[strategy_name] += abs(profit_in_curr_b)
-
-    # def determine_trade_direction(self, strategy_name, base_pct_change, pred_pct_change, base_lower_band, 
-    #                               base_upper_band, pred_lower_band, pred_upper_band, llm_sentiment):
-    #     """Determine the trade direction based on strategy and ratio changes."""
-    #     trade_direction = 'no_trade'
-
-    #     if(strategy_name == "mean_reversion"):
-    #         if base_pct_change < base_lower_band:
-    #             trade_direction = 'buy_currency_a'
-    #         elif base_pct_change > base_upper_band:
-    #             trade_direction = 'sell_currency_a'
-
-    #     elif(strategy_name == "trend"):
-    #         if base_pct_change < base_lower_band:
-    #             trade_direction = 'sell_currency_a'
-    #         elif base_pct_change > base_upper_band:
-    #             trade_direction = 'buy_currency_a'
-
-    #     elif(strategy_name == "pure_forcasting"):
-    #         if pred_pct_change < pred_lower_band:
-    #             trade_direction = 'sell_currency_a'
-    #         elif pred_pct_change > pred_upper_band:
-    #             trade_direction = 'buy_currency_a'
-
-    #     elif(strategy_name == "hybrid_mean_reversion"):
-    #         if base_pct_change < base_lower_band and pred_pct_change > pred_upper_band:
-    #             trade_direction = 'buy_currency_a'
-    #         elif base_pct_change > base_upper_band and pred_pct_change < pred_lower_band:
-    #             trade_direction = 'sell_currency_a'
-
-    #     elif(strategy_name == "hybrid_trend"):
-    #         if base_pct_change < base_lower_band and pred_pct_change < pred_lower_band:
-    #             trade_direction = 'sell_currency_a'
-    #         elif base_pct_change > base_upper_band and pred_pct_change > pred_upper_band:
-    #             trade_direction = 'buy_currency_a'
-
-    #     elif(strategy_name == 'llm'):
-    #         if(llm_sentiment == -1):
-    #             trade_direction = 'sell_currency_a'
-    #         elif(llm_sentiment == 1):
-    #             trade_direction = 'buy_currency_a'
-            
-    #     return trade_direction
     
     def determine_trade_direction(self, strategy_name, base_pct_change, pred_pct_change, base_lower_band, 
                                   base_upper_band, pred_lower_band, pred_upper_band, llm_sentiment):
@@ -366,6 +347,12 @@ class TradingStrategy():
         print(f"Classes present after augmentation: {sorted(np.unique(y))} "
             f"(synthetic added for: {missing})")
 
+    def display_profit(self):
+        """Display the profit for each strategy."""
+        print("Profit per strategy:")
+        for strategy, returns in self.trade_returns.items():
+            print(f"Trade returns for {strategy}: {returns}")
+
     def display_total_profit(self):
         """Display the total profit or loss for each strategy."""
         print(f"Total Profits - {self.total_profit_or_loss}")
@@ -398,21 +385,7 @@ class TradingStrategy():
         base_mas, base_stds, base_upper_bands, base_lower_bands = TradingUtils.calculate_bollinger_bands(base_pct_incs)
         pred_mas, pred_stds, pred_upper_bands, pred_lower_bands = TradingUtils.calculate_bollinger_bands(pred_pct_incs)
 
-        for i in range(1, len(actual_rates)-1):
-            # Continuous features
-            # feature = [
-            #     base_pct_incs[i],
-            #     pred_pct_incs[i],
-            #     (base_pct_incs[i] - base_mas[i]) / (base_stds[i] + 1e-9),   # price z
-            #     (pred_pct_incs[i] - pred_mas[i]) / (pred_stds[i] + 1e-9),   # pred z
-            #     base_upper_bands[i] - base_pct_incs[i], base_pct_incs[i] - base_lower_bands[i],   # distances to bands
-            #     pred_upper_bands[i] - pred_pct_incs[i], pred_pct_incs[i] - pred_lower_bands[i],
-            #     base_stds[i],                   # 20-lag vol
-            #     pred_stds[i],
-            #     base_mas[i],                   # short momentum
-            #     pred_mas[i],
-            #     # add spread/fee proxies, TOD dummies, etc.
-            # ]
+        for i in range(1, len(actual_rates) - 1):
             feature = [
                 self.label_mapping["buy_currency_a"] if base_pct_incs[i] < 0 else self.label_mapping["sell_currency_a"] if base_pct_incs[i] > 0 else self.label_mapping["no_trade"],
                 self.label_mapping["buy_currency_a"] if pred_pct_incs[i] > 0 else self.label_mapping["sell_currency_a"] if pred_pct_incs[i] < 0 else self.label_mapping["no_trade"],
@@ -426,18 +399,20 @@ class TradingStrategy():
 
         return list(zip(X, y))
         
-    def _execute_trading_strategy(self, strategy_name, actual_rates, pred_rates, bid_prices, ask_prices, 
+    def _execute_trading_strategy(self, strategy_name, true_mid_prices, pred_mid_prices, true_bid_prices, true_ask_prices, pred_bid_prices, pred_ask_prices, 
                                  use_kelly, enable_transaction_costs, hold_position):
         """Helper method to execute trading for a specific strategy."""
-        base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
+        base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(true_mid_prices, pred_mid_prices)
         
         # Calculate Bollinger bands
         _, _, base_upper_bands, base_lower_bands = TradingUtils.calculate_bollinger_bands(base_pct_incs)
         _, _, pred_upper_bands, pred_lower_bands = TradingUtils.calculate_bollinger_bands(pred_pct_incs)
         
-        for i in range(1, len(actual_rates) - 1):
-            curr_bid_price = bid_prices[i]
-            curr_ask_price = ask_prices[i]
+        for i in range(1, len(true_mid_prices) - 1):
+            curr_bid_price = true_bid_prices[i]
+            curr_ask_price = true_ask_prices[i]
+            pred_bid_price = pred_bid_prices[i]
+            pred_ask_price = pred_ask_prices[i]
 
             base_pct_inc = base_pct_incs[i]
             pred_pct_inc = pred_pct_incs[i]
@@ -456,34 +431,21 @@ class TradingStrategy():
             )
 
             # Execute trade
-            self.execute_trade(strategy_name, trade_direction, curr_bid_price, curr_ask_price, 
+            self.execute_trade(strategy_name, trade_direction, curr_bid_price, curr_ask_price, pred_bid_price, pred_ask_price, 
                                          f_i, use_kelly, enable_transaction_costs, hold_position)
+            
 
-    def _execute_ensemble_strategy(self, actual_rates, pred_rates, bid_prices, ask_prices, use_kelly, enable_transaction_costs, hold_position, min_conf=0.0):
+    def _execute_ensemble_strategy(self, true_mid_prices, pred_mid_prices, true_bid_prices, true_ask_prices, pred_bid_prices, pred_ask_prices, use_kelly, enable_transaction_costs, hold_position, min_conf=0.0):
         """Helper method to execute ensemble trading strategy."""
         strategy_name = "ensemble"
-        base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
+        base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(true_mid_prices, pred_mid_prices)
         # Bollinger on base & pred pct
         base_mas, base_stds, base_upper_bands, base_lower_bands = TradingUtils.calculate_bollinger_bands(base_pct_incs)
         pred_mas, pred_stds, pred_upper_bands, pred_lower_bands = TradingUtils.calculate_bollinger_bands(pred_pct_incs)
 
         classes = [0, 1, 2]
 
-        for i in range(1, len(actual_rates) - 1):
-            # Continuous features
-            # feature = [
-            #     base_pct_incs[i],
-            #     pred_pct_incs[i],
-            #     (base_pct_incs[i]-base_mas[i]) / (base_stds[i]+1e-9),   # price z
-            #     (pred_pct_incs[i]-pred_mas[i]) / (pred_stds[i]+1e-9),   # pred z
-            #     base_upper_bands[i]-base_pct_incs[i], base_pct_incs[i]-base_lower_bands[i],   # distances to bands
-            #     pred_upper_bands[i]-pred_pct_incs[i], pred_pct_incs[i]-pred_lower_bands[i],
-            #     base_stds[i],                   # 20-lag vol
-            #     pred_stds[i],
-            #     base_mas[i],                   # short momentum
-            #     pred_mas[i],
-            #     # add spread/fee proxies, TOD dummies, etc.
-            # ]
+        for i in range(1, len(true_mid_prices) - 1):
             feature = [
                 self.label_mapping["buy_currency_a"] if base_pct_incs[i] < 0 else self.label_mapping["sell_currency_a"] if base_pct_incs[i] > 0 else self.label_mapping["no_trade"],
                 self.label_mapping["buy_currency_a"] if pred_pct_incs[i] > 0 else self.label_mapping["sell_currency_a"] if pred_pct_incs[i] < 0 else self.label_mapping["no_trade"],
@@ -509,12 +471,14 @@ class TradingStrategy():
             else:
                 trade_direction = 'no_trade'
 
-            curr_bid_price = bid_prices[i]
-            curr_ask_price = ask_prices[i]
+            curr_bid_price = true_bid_prices[i]
+            curr_ask_price = true_ask_prices[i]
+            pred_bid_price = pred_bid_prices[i]
+            pred_ask_price = pred_ask_prices[i]
 
             # Calculate Kelly fraction and execute trade
             f_i = self.kelly_criterion(strategy_name)
-            self.execute_trade(strategy_name, trade_direction, curr_bid_price, curr_ask_price, 
+            self.execute_trade(strategy_name, trade_direction, curr_bid_price, curr_ask_price, pred_bid_price, pred_ask_price, 
                                          f_i, use_kelly, enable_transaction_costs, hold_position)
         
     def _close_all_remaining_positions(self, strategy_names, bid_prices, ask_prices, enable_transaction_costs):
@@ -530,44 +494,48 @@ class TradingStrategy():
                     
                 self.close_position(strategy_name, sell_price, buy_price)
 
-    def simulate_trading_with_strategies(self, actual_rates, pred_rates, bid_prices, ask_prices, llm_sentiments, use_kelly=True, enable_transaction_costs=False, hold_position=False):
+    def simulate_trading_with_strategies(self, true_mid_prices, pred_mid_prices, true_bid_prices, true_ask_prices, pred_bid_prices, pred_ask_prices, llm_sentiments, use_kelly=True, enable_transaction_costs=False, hold_position=False):
         """Simulate trading over a series of exchange rates using different strategies."""
 
         strategy_name = "ensemble"
         
         # Phase 1: Data preparation and splitting
-        split_idx = len(actual_rates) // 2
+        split_idx = len(true_mid_prices) // 2
         
-        actual_rates_train = actual_rates[:split_idx]
-        pred_rates_train = pred_rates[:split_idx]
+        true_mid_prices_train = true_mid_prices[:split_idx]
+        pred_mid_prices_train = pred_mid_prices[:split_idx]
+        true_bid_prices_train = true_bid_prices[:split_idx]
+        true_ask_prices_train = true_ask_prices[:split_idx]
+        pred_bid_prices_train = pred_bid_prices[:split_idx]
+        pred_ask_prices_train = pred_ask_prices[:split_idx]
         llm_sentiments_train = llm_sentiments[:split_idx]
         
-        actual_rates_test = actual_rates[split_idx:]
-        pred_rates_test = pred_rates[split_idx:]
-        bid_prices_test = bid_prices[split_idx:]
-        ask_prices_test = ask_prices[split_idx:]
+        true_mid_prices_test = true_mid_prices[split_idx:]
+        pred_mid_prices_test = pred_mid_prices[split_idx:]
+        true_bid_prices_test = true_bid_prices[split_idx:]
+        true_ask_prices_test = true_ask_prices[split_idx:]
+        pred_bid_prices_test = pred_bid_prices[split_idx:]
+        pred_ask_prices_test = pred_ask_prices[split_idx:]
         llm_sentiments_test = llm_sentiments[split_idx:]
 
         # Phase 2: Train ensemble model
         print("Training ensemble model...")
-        historical_data = self._generate_training_data(actual_rates_train, pred_rates_train, llm_sentiments_train)
+        historical_data = self._generate_training_data(true_mid_prices_train, pred_mid_prices_train, llm_sentiments_train)
         print(f"Length of historical_data: {len(historical_data)}")
         self.train_ensemble_model(historical_data)
 
         # Phase 3: Execute trading strategies
         print("Executing ensemble strategy...")
-        self._execute_ensemble_strategy(actual_rates_test, pred_rates_test, bid_prices_test, 
-                                       ask_prices_test, use_kelly, enable_transaction_costs, hold_position)
+        self._execute_ensemble_strategy(true_mid_prices_test, pred_mid_prices_test, true_bid_prices_test, true_ask_prices_test, pred_bid_prices_test, pred_ask_prices_test, use_kelly, enable_transaction_costs, hold_position)
         
         print("Executing base strategies...")
         base_strategy_names = ['mean_reversion', 'trend', 'pure_forcasting', 'hybrid_mean_reversion', 'hybrid_trend']
         for strategy_name in base_strategy_names:
-            self._execute_trading_strategy(strategy_name, actual_rates_test, pred_rates_test, 
-                                         bid_prices_test, ask_prices_test, use_kelly, enable_transaction_costs, hold_position)
+            self._execute_trading_strategy(strategy_name, true_mid_prices_test, pred_mid_prices_test, true_bid_prices_test, true_ask_prices_test, pred_bid_prices_test, pred_ask_prices_test, use_kelly, enable_transaction_costs, hold_position)
             
          # Phase 4: Close remaining positions and calculate results
         all_strategy_names = base_strategy_names + ['ensemble']
-        self._close_all_remaining_positions(all_strategy_names, bid_prices_test, ask_prices_test, enable_transaction_costs)
+        self._close_all_remaining_positions(all_strategy_names, true_bid_prices_test, true_ask_prices_test, enable_transaction_costs)
 
         # Calculate Sharpe ratios for selected strategies
         selected_strategies = ['mean_reversion', 'trend', 'pure_forcasting', 'ensemble']
@@ -576,6 +544,7 @@ class TradingStrategy():
 
         # Display results
         print("=== Trading Simulation Results ===")
+        self.display_profit()
         self.display_total_profit()
         self.diplay_num_trades()
         print("\n")
