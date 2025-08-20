@@ -69,9 +69,9 @@ def run_sl_based_trading_strategy(model_config):
         true_values = generated_values['true_values']
     elif model_config.MODEL_NAME == 'toto':
         predictor = TotoFinancialForecastingModel(dataProcessor, model_config)
-        _, _, test_series, test_dates, test_bid_prices, test_ask_prices, test_with_prompt, test_without_prompt = predictor.split_and_scale_data()
+        test_series, test_dates, test_bid_prices, test_ask_prices, test_with_prompt, test_without_prompt = predictor.split_and_scale_data()
         predicted_values = predictor.generate_predictions(test_series)
-        true_values = predictor.get_true_values(test_series)
+        true_values = predictor.test_mid_prices[model_config.INPUT_CHUNK_LENGTH:]
     else:
         predictor = DartsFinancialForecastingModel(dataProcessor, model_config)
         train_series, valid_series, test_series, test_dates, test_bid_prices, test_ask_prices, test_with_prompt, test_without_prompt = predictor.split_and_scale_data()
