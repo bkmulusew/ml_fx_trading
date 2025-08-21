@@ -22,7 +22,7 @@ def plot_prediction_comparison(true_values, predicted_values, model_config):
     plt.savefig(f'{model_config.OUTPUT_DIR}/true_vs_predicted_{model_config.MODEL_NAME}.png', dpi=300, bbox_inches='tight')
     plt.clf()
 
-def group_data_by_date(dates, true_values, predicted_values, bid_prices, ask_prices, with_prompt_values, without_prompt_values):
+def group_data_by_date(dates, true_values, predicted_values, bid_prices, ask_prices, with_prompt_values, without_prompt_values, label_value):
     """Group all test data by date for trading simulation."""
     # Parse test_dates into datetime objects
     
@@ -33,12 +33,13 @@ def group_data_by_date(dates, true_values, predicted_values, bid_prices, ask_pri
         "bid_price": [], 
         "ask_price": [], 
         "with_prompt": [], 
-        "without_prompt": []
+        "without_prompt": [],
+        "label" : []
     })
     
     # Chunk data by date
-    for date, true_val, pred_val, bid_price, ask_price, with_prompt_val, without_prompt_val in zip(
-            dates, true_values, predicted_values, bid_prices, ask_prices, with_prompt_values, without_prompt_values
+    for date, true_val, pred_val, bid_price, ask_price, with_prompt_val, without_prompt_val, label_val in zip(
+            dates, true_values, predicted_values, bid_prices, ask_prices, with_prompt_values, without_prompt_values, label_value
         ):
         date_key = date.date()  # Use only the date part as the key
         chunked_values[date_key]["true_values"].append(true_val)
@@ -47,6 +48,7 @@ def group_data_by_date(dates, true_values, predicted_values, bid_prices, ask_pri
         chunked_values[date_key]["ask_price"].append(ask_price)
         chunked_values[date_key]["with_prompt"].append(with_prompt_val)
         chunked_values[date_key]["without_prompt"].append(without_prompt_val)
+        chunked_values[date_key]["label"].append(label_val)
     
     return chunked_values
 
@@ -69,12 +71,12 @@ def run_sl_based_trading_strategy(model_config):
         true_values = generated_values['true_values']
     elif model_config.MODEL_NAME == 'toto':
         predictor = TotoFinancialForecastingModel(dataProcessor, model_config)
-        _, _, test_series, test_dates, test_bid_prices, test_ask_prices, test_with_prompt, test_without_prompt = predictor.split_and_scale_data()
+        _, _, test_series, test_dates, test_bid_prices, test_ask_prices, test_with_prompt, test_without_prompt, test_labels = predictor.split_and_scale_data()
         predicted_values = predictor.generate_predictions(test_series)
         true_values = predictor.get_true_values(test_series)
     else:
         predictor = DartsFinancialForecastingModel(dataProcessor, model_config)
-        train_series, valid_series, test_series, test_dates, test_bid_prices, test_ask_prices, test_with_prompt, test_without_prompt = predictor.split_and_scale_data()
+        train_series, valid_series, test_series, test_dates, test_bid_prices, test_ask_prices, test_with_prompt, test_without_prompt, test_labels = predictor.split_and_scale_data()
         predictor.train(train_series, valid_series)
         predicted_values = predictor.generate_predictions(test_series)
         true_values = predictor.get_true_values(test_series)
@@ -97,7 +99,8 @@ def run_sl_based_trading_strategy(model_config):
         test_bid_prices, 
         test_ask_prices,
         test_with_prompt, 
-        test_without_prompt
+        test_without_prompt,
+        test_labels
     )
 
     # Use Kelly
@@ -138,7 +141,7 @@ def run_sl_based_trading_strategy(model_config):
             continue
 
         trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B)
-        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["with_prompt"], enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS, hold_position=model_config.HOLD_POSITION)
+        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["with_prompt"], values["label"], enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS, hold_position=model_config.HOLD_POSITION)
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
         forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])
@@ -308,7 +311,7 @@ def run_sl_based_trading_strategy(model_config):
             continue
 
         trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B)
-        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["with_prompt"], use_kelly=False, enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS, hold_position=model_config.HOLD_POSITION)
+        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["with_prompt"], values["label"], use_kelly=False, enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS, hold_position=model_config.HOLD_POSITION)
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
         forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])

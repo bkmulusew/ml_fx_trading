@@ -99,7 +99,7 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
 
     def split_and_scale_data(self, train_ratio=0.5, validation_ratio=0.1):
         """Splits the data into training, validation, and test sets and applies scaling."""
-        dates, bid_prices, ask_prices, mid_price, with_prompt_values, without_prompt_values = self.data_processor.extract_price_time_series()
+        dates, bid_prices, ask_prices, mid_price, with_prompt_values, without_prompt_values, label_values = self.data_processor.extract_price_time_series()
 
         # Calculate indices for splitting
         num_observations = len(mid_price)
@@ -118,7 +118,8 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
             bid_prices=bid_prices[validation_end_index:],
             ask_prices=ask_prices[validation_end_index:],
             without_prompt=without_prompt_values[validation_end_index:],
-            with_prompt=with_prompt_values[validation_end_index:]
+            with_prompt=with_prompt_values[validation_end_index:],
+            label=label_values[validation_end_index:]
         )
 
         return (*scaled_series, *test_data)

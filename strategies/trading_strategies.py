@@ -390,7 +390,7 @@ class TradingStrategy():
         """Display the number of trades for each strategy."""
         print(f"Number of trades - {self.num_trades}")
     
-    def _generate_training_data(self, actual_rates, pred_rates, llm_sentiments):
+    def _generate_training_data(self, actual_rates, pred_rates, llm_sentiments, llm_label):
         X, y = [], []
         base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
         
@@ -462,7 +462,7 @@ class TradingStrategy():
             # Update tracking variables
             self._update_strategy_metrics(strategy_name, profit)
 
-    def _execute_ensemble_strategy(self, actual_rates, pred_rates, bid_prices, ask_prices, use_kelly, enable_transaction_costs, hold_position, min_conf=0.0):
+    def _execute_ensemble_strategy(self, actual_rates, pred_rates, bid_prices, ask_prices, llm_labels, use_kelly, enable_transaction_costs, hold_position, min_conf=0.0):
         """Helper method to execute ensemble trading strategy."""
         strategy_name = "ensemble"
         base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
@@ -504,13 +504,29 @@ class TradingStrategy():
 
             # Convert to trade direction
             if pred_best_prob < min_conf:
-                trade_direction = 'no_trade'
+                if (llm_labels[i] == 0):
+                    trade_direction = 'no_trade'
+                elif (llm_labels[i] == 1):
+                    trade_direction = 'buy_currency_a'
+                else:
+                    trade_direction = 'sell_currency_a'
             elif pred_trade_direction == self.label_mapping["buy_currency_a"]:
-                trade_direction = 'buy_currency_a'
+                if (llm_labels[i] != -1):
+                    trade_direction = 'buy_currency_a'
+                else:
+                    trade_direction = 'no_trade'
             elif pred_trade_direction == self.label_mapping["sell_currency_a"]:
-                trade_direction = 'sell_currency_a'
+                if (llm_labels[i] != 1):
+                    trade_direction = 'sell_currency_a'
+                else:
+                    trade_direction = 'no_trade'
             else:
-                trade_direction = 'no_trade'
+                if (llm_labels[i] == 0):
+                    trade_direction = 'no_trade'
+                elif (llm_labels[i] == 1):
+                    trade_direction = 'buy_currency_a'
+                else:
+                    trade_direction = 'sell_currency_a'
 
             curr_bid_price = bid_prices[i]
             curr_ask_price = ask_prices[i]
@@ -551,7 +567,7 @@ class TradingStrategy():
                 self.total_profit_or_loss[strategy_name] += profit
                 self.trade_returns[strategy_name].append(profit)
 
-    def simulate_trading_with_strategies(self, actual_rates, pred_rates, bid_prices, ask_prices, llm_sentiments, use_kelly=True, enable_transaction_costs=False, hold_position=False):
+    def simulate_trading_with_strategies(self, actual_rates, pred_rates, bid_prices, ask_prices, llm_sentiments, llm_labels, use_kelly=True, enable_transaction_costs=False, hold_position=False):
         """Simulate trading over a series of exchange rates using different strategies."""
 
         strategy_name = "ensemble"
@@ -562,23 +578,25 @@ class TradingStrategy():
         actual_rates_train = actual_rates[:split_idx]
         pred_rates_train = pred_rates[:split_idx]
         llm_sentiments_train = llm_sentiments[:split_idx]
+        llm_labels_train = llm_labels[:split_idx]
         
         actual_rates_test = actual_rates[split_idx:]
         pred_rates_test = pred_rates[split_idx:]
         bid_prices_test = bid_prices[split_idx:]
         ask_prices_test = ask_prices[split_idx:]
         llm_sentiments_test = llm_sentiments[split_idx:]
+        llm_labels_test = llm_labels[split_idx:]
 
         # Phase 2: Train ensemble model
         print("Training ensemble model...")
-        historical_data = self._generate_training_data(actual_rates_train, pred_rates_train, llm_sentiments_train)
+        historical_data = self._generate_training_data(actual_rates_train, pred_rates_train, llm_sentiments_train, llm_labels_train)
         print(f"Length of historical_data: {len(historical_data)}")
         self.train_ensemble_model(historical_data)
 
         # Phase 3: Execute trading strategies
         print("Executing ensemble strategy...")
         self._execute_ensemble_strategy(actual_rates_test, pred_rates_test, bid_prices_test, 
-                                       ask_prices_test, use_kelly, enable_transaction_costs, hold_position)
+                                       ask_prices_test, llm_labels_test, use_kelly, enable_transaction_costs, hold_position)
         
         print("Executing base strategies...")
         base_strategy_names = ['mean_reversion', 'trend', 'pure_forcasting', 'hybrid_mean_reversion', 'hybrid_trend']

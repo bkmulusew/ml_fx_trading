@@ -29,11 +29,28 @@ class DataProcessor:
         else:
             mid_price_series = TimeSeries.from_dataframe(df, value_cols=["mid_price"])
 
+        LLM_data = pd.read_csv("dataset/Zero Shot News File_09-00-16-30.csv")
+        LLM_dates = LLM_data["Time"].tolist()
+        expert_prompt_label = LLM_data["Expert Prompt Label"].tolist()
+        naive_prompt_label = LLM_data["Naive Prompt Label"].tolist()
+        competitior_label = LLM_data["Competitor Label"].tolist()
+        naive_converted_prompt_label = LLM_data["Naive + Converted Prompt Label"].tolist()
+
+        date_to_label = dict(zip(LLM_dates, naive_converted_prompt_label))
+
+        labels = [date_to_label.get(d, 0) for d in dates]
+
+        llm_label = [0, 0, 0]
+
+        for i in range(3, len(labels)):
+            llm_label.append(labels[i-3])
+
         return (
             dates,
             bid_prices,
             ask_prices,
             mid_price_series,
             with_prompt_values,
-            without_prompt_values
+            without_prompt_values,
+            llm_label
         )
