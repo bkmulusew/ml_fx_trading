@@ -96,7 +96,7 @@ class TradingStrategy():
         win_loss_ratio = self.win_loss_ratio(strategy_name)
 
         f = win_prob - ((1 - win_prob) / win_loss_ratio) # Basic Kelly calculation
-        f = max(0.01, f) # Ensure kelly is non-negative
+        f = max(0.005, f) # Ensure kelly is non-negative
         f *= self.kelly_fraction # Fractional Kelly
 
         return f
@@ -119,13 +119,42 @@ class TradingStrategy():
                 new_position_type = 'long' if trade_direction == 'buy_currency_a' else 'short' if trade_direction == 'sell_currency_a' else None
                 
                 if new_position_type is not None and new_position_type != current_position_type:
-                    self.close_position(strategy_name, sell_price, buy_price)
+                    if enable_transaction_costs:
+                        if self.open_positions[strategy_name]['type'] == 'long':
+                            if bid_price > self.open_positions[strategy_name]['entry_ratio']:
+                                self.close_position(strategy_name, sell_price, buy_price)
+                            else:
+                                self.trade_returns[strategy_name].append(0.0)
+                                return
+                        elif self.open_positions[strategy_name]['type'] == 'short':
+                            if ask_price < self.open_positions[strategy_name]['entry_ratio']:
+                                self.close_position(strategy_name, sell_price, buy_price)
+                            else:
+                                self.trade_returns[strategy_name].append(0.0)
+                                return
+                    else:
+                        self.close_position(strategy_name, sell_price, buy_price)
                 else:
                     # If same type or no trade, don't make a new trade
+                    self.trade_returns[strategy_name].append(0.0)
                     return
             else:
                 # If hold position is not enabled, close the position
-                self.close_position(strategy_name, sell_price, buy_price)
+                if enable_transaction_costs:
+                    if self.open_positions[strategy_name]['type'] == 'long':
+                        if bid_price > self.open_positions[strategy_name]['entry_ratio']:
+                            self.close_position(strategy_name, sell_price, buy_price)
+                        else:
+                            self.trade_returns[strategy_name].append(0.0)
+                            return
+                    elif self.open_positions[strategy_name]['type'] == 'short':
+                        if ask_price < self.open_positions[strategy_name]['entry_ratio']:
+                            self.close_position(strategy_name, sell_price, buy_price)
+                        else:
+                            self.trade_returns[strategy_name].append(0.0)
+                            return
+                else:
+                    self.close_position(strategy_name, sell_price, buy_price)
         
         # Then open new position if there's a trade signal and no matching position type
         if trade_direction != 'no_trade':
@@ -213,49 +242,6 @@ class TradingStrategy():
         elif profit_in_curr_b < 0:
             self.num_losses[strategy_name] += 1
             self.total_losses[strategy_name] += abs(profit_in_curr_b)
-
-    # def determine_trade_direction(self, strategy_name, base_pct_change, pred_pct_change, base_lower_band, 
-    #                               base_upper_band, pred_lower_band, pred_upper_band, llm_sentiment):
-    #     """Determine the trade direction based on strategy and ratio changes."""
-    #     trade_direction = 'no_trade'
-
-    #     if(strategy_name == "mean_reversion"):
-    #         if base_pct_change < base_lower_band:
-    #             trade_direction = 'buy_currency_a'
-    #         elif base_pct_change > base_upper_band:
-    #             trade_direction = 'sell_currency_a'
-
-    #     elif(strategy_name == "trend"):
-    #         if base_pct_change < base_lower_band:
-    #             trade_direction = 'sell_currency_a'
-    #         elif base_pct_change > base_upper_band:
-    #             trade_direction = 'buy_currency_a'
-
-    #     elif(strategy_name == "pure_forcasting"):
-    #         if pred_pct_change < pred_lower_band:
-    #             trade_direction = 'sell_currency_a'
-    #         elif pred_pct_change > pred_upper_band:
-    #             trade_direction = 'buy_currency_a'
-
-    #     elif(strategy_name == "hybrid_mean_reversion"):
-    #         if base_pct_change < base_lower_band and pred_pct_change > pred_upper_band:
-    #             trade_direction = 'buy_currency_a'
-    #         elif base_pct_change > base_upper_band and pred_pct_change < pred_lower_band:
-    #             trade_direction = 'sell_currency_a'
-
-    #     elif(strategy_name == "hybrid_trend"):
-    #         if base_pct_change < base_lower_band and pred_pct_change < pred_lower_band:
-    #             trade_direction = 'sell_currency_a'
-    #         elif base_pct_change > base_upper_band and pred_pct_change > pred_upper_band:
-    #             trade_direction = 'buy_currency_a'
-
-    #     elif(strategy_name == 'llm'):
-    #         if(llm_sentiment == -1):
-    #             trade_direction = 'sell_currency_a'
-    #         elif(llm_sentiment == 1):
-    #             trade_direction = 'buy_currency_a'
-            
-    #     return trade_direction
     
     def determine_trade_direction(self, strategy_name, base_pct_change, pred_pct_change, base_lower_band, 
                                   base_upper_band, pred_lower_band, pred_upper_band, llm_sentiment):
@@ -399,20 +385,6 @@ class TradingStrategy():
         pred_mas, pred_stds, pred_upper_bands, pred_lower_bands = TradingUtils.calculate_bollinger_bands(pred_pct_incs)
 
         for i in range(1, len(actual_rates)-1):
-            # Continuous features
-            # feature = [
-            #     base_pct_incs[i],
-            #     pred_pct_incs[i],
-            #     (base_pct_incs[i] - base_mas[i]) / (base_stds[i] + 1e-9),   # price z
-            #     (pred_pct_incs[i] - pred_mas[i]) / (pred_stds[i] + 1e-9),   # pred z
-            #     base_upper_bands[i] - base_pct_incs[i], base_pct_incs[i] - base_lower_bands[i],   # distances to bands
-            #     pred_upper_bands[i] - pred_pct_incs[i], pred_pct_incs[i] - pred_lower_bands[i],
-            #     base_stds[i],                   # 20-lag vol
-            #     pred_stds[i],
-            #     base_mas[i],                   # short momentum
-            #     pred_mas[i],
-            #     # add spread/fee proxies, TOD dummies, etc.
-            # ]
             feature = [
                 self.label_mapping["buy_currency_a"] if base_pct_incs[i] < 0 else self.label_mapping["sell_currency_a"] if base_pct_incs[i] > 0 else self.label_mapping["no_trade"],
                 self.label_mapping["buy_currency_a"] if pred_pct_incs[i] > 0 else self.label_mapping["sell_currency_a"] if pred_pct_incs[i] < 0 else self.label_mapping["no_trade"],
@@ -470,20 +442,6 @@ class TradingStrategy():
         classes = [0, 1, 2]
 
         for i in range(1, len(actual_rates) - 1):
-            # Continuous features
-            # feature = [
-            #     base_pct_incs[i],
-            #     pred_pct_incs[i],
-            #     (base_pct_incs[i]-base_mas[i]) / (base_stds[i]+1e-9),   # price z
-            #     (pred_pct_incs[i]-pred_mas[i]) / (pred_stds[i]+1e-9),   # pred z
-            #     base_upper_bands[i]-base_pct_incs[i], base_pct_incs[i]-base_lower_bands[i],   # distances to bands
-            #     pred_upper_bands[i]-pred_pct_incs[i], pred_pct_incs[i]-pred_lower_bands[i],
-            #     base_stds[i],                   # 20-lag vol
-            #     pred_stds[i],
-            #     base_mas[i],                   # short momentum
-            #     pred_mas[i],
-            #     # add spread/fee proxies, TOD dummies, etc.
-            # ]
             feature = [
                 self.label_mapping["buy_currency_a"] if base_pct_incs[i] < 0 else self.label_mapping["sell_currency_a"] if base_pct_incs[i] > 0 else self.label_mapping["no_trade"],
                 self.label_mapping["buy_currency_a"] if pred_pct_incs[i] > 0 else self.label_mapping["sell_currency_a"] if pred_pct_incs[i] < 0 else self.label_mapping["no_trade"],
