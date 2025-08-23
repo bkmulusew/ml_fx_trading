@@ -92,7 +92,8 @@ def run_sl_based_trading_strategy(model_config):
         predictor = ChronosFinancialForecastingModel(dataProcessor, model_config)
         test_series, test_dates, test_bid_prices, test_ask_prices, test_news_sentiments = predictor.split_and_scale_data()
         predicted_values = predictor.generate_predictions(test_series)
-        true_values = predictor.test_mid_prices[model_config.INPUT_CHUNK_LENGTH:]    else:
+        true_values = predictor.test_mid_prices[model_config.INPUT_CHUNK_LENGTH:]
+    else:
         predictor = DartsFinancialForecastingModel(dataProcessor, model_config)
         train_series, valid_series, test_series, test_dates, test_bid_prices, test_ask_prices, test_news_sentiments = predictor.split_and_scale_data()
         predictor.train(train_series, valid_series)
