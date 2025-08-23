@@ -3,7 +3,6 @@ import numpy as np
 import torch
 from sklearn.preprocessing import MinMaxScaler
 from chronos import ChronosBoltPipeline
-from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 
 class ChronosFinancialForecastingModel(FinancialForecastingModel):
     """Financial forecasting model using Amazon's Chronos-bolt, a pre-trained transformer for zero-shot forecasting"""
@@ -84,7 +83,7 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
         """Make prediction for a batch of input sequences"""
 
         # Convert to tensor (BATCH_SIZE, INPUT_CHUNK_LENGTH)
-        batch_array = np.array(input_sequences, dtype=np.float32)
+        batch_array = np.array(input_sequences, dtype=np.float32).squeeze(axis=-1)
         inputs = torch.FloatTensor(batch_array).to(self.device)
 
         try:
@@ -93,54 +92,43 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
                 # median_percentile = quantiles[:, :, 4]
                 
             # predictions = median_percentile.cpu().numpy().flatten()
-            predictions = mean.cpu().numpy().flatten()
-            return predictions.tolist()
+            predictions = mean.cpu().numpy()
+            return predictions
 
         except Exception as e:
             print(f"Error in batch prediction: {e}")
             return [seq[-1] for seq in input_sequences]
 
 
-    def generate_predictions(self, test_series):
+    def generate_predictions(self, data):
         """Generate predictions using sliding window with batching"""
 
+        # data shape: (time_steps, 1)
+        num_timesteps, _ = data.shape
+
         # Calculate how many predictions we can make
-        num_predictions = len(test_series) - self.model_config.INPUT_CHUNK_LENGTH
+        num_predictions = num_timesteps - self.model_config.INPUT_CHUNK_LENGTH
+
+        if num_predictions <= 0:
+            raise ValueError(f"Not enough data points. Need at least {self.model_config.INPUT_CHUNK_LENGTH + 1} timesteps, got {num_timesteps}")
         
-        # Generate predictions sequentially
-        scaled_predictions = []
+        # Allocate storage for predictions
+        all_predictions = np.empty(num_predictions, dtype=np.float32)
 
         for batch_idx in range(0, num_predictions, self.model_config.BATCH_SIZE):
             # Calculate batch boundaries
             batch_start = batch_idx
             batch_end = min(batch_idx + self.model_config.BATCH_SIZE, num_predictions)
-            batch_size_actual = batch_end - batch_start
 
             # Create batch of input sequences
-            batch_sequences = []
-
-            for pred_idx in range(batch_start, batch_end):
-                # Get the sequence for this prediction
-                start_idx = pred_idx
-                end_idx = pred_idx + self.model_config.INPUT_CHUNK_LENGTH
-                sequence = test_series[start_idx:end_idx]
-                batch_sequences.append(sequence)
-
-            # Convert to numpy array for batch processing
-            batch_input = np.array(batch_sequences, dtype=np.float32)
+            indices = np.arange(batch_start, batch_end)[:, None] + np.arange(self.model_config.INPUT_CHUNK_LENGTH)
+            batch_input = data[indices]  # Shape: (actual_batch_size, INPUT_CHUNK_LENGTH, 1)
             
-            # Get predictions for this batch
-            batch_predictions = self.predict_future_values(batch_input)
-            
-            # Validate prediction count matches expected batch size
-            if len(batch_predictions) != batch_size_actual:
-                print(f"Warning: Expected {batch_size_actual} predictions, got {len(batch_predictions)}")
-            
-            scaled_predictions.extend(batch_predictions)
+            predictions = self.predict_future_values(batch_input)
+            all_predictions[batch_start:batch_end] = predictions[:, 0]
 
-        # Inverse transform and align metadata
-        predicted_values = self.scaler.inverse_transform(
-            np.array(scaled_predictions, dtype=np.float32).reshape(-1, 1)
-        ).flatten()
+        # Inverse transform
+        predictions_reshaped = all_predictions.reshape(-1, 1)
+        predicted_mid_prices = self.scaler.inverse_transform(predictions_reshaped).ravel().tolist()
 
-        return predicted_values.tolist()
+        return predicted_mid_prices
