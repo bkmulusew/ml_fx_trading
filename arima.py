@@ -99,7 +99,6 @@ def plot_acf_pacf_arima010(series, lags=40):
 if __name__ == "__main__":
     df = pd.read_csv('dataset/usd-cnh-2024-2025.csv', header=0, parse_dates=[0], index_col=0)
     # df = pd.read_csv('dataset/usd-cny-2023.csv', header=0, parse_dates=[0], index_col=0)
-    # Squeeze returns new object, so assign it
     df = df.squeeze('columns')
 
     mid = df[df.columns[2]]
