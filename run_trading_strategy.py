@@ -1,6 +1,9 @@
+# importing to set up reproducibility 
+import os
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 from utils import ModelConfig
 from data_processing import DataProcessor
-from models import DartsFinancialForecastingModel, PytorchFinancialForecastingModel, TotoFinancialForecastingModel
+from models import DartsFinancialForecastingModel, ChronosFinancialForecastingModel, TotoFinancialForecastingModel#, PytorchFinancialForecastingModel
 from metrics import ModelEvaluationMetrics
 from matplotlib import pyplot as plt
 import numpy as np
@@ -10,6 +13,21 @@ from strategies import TradingStrategy
 from collections import defaultdict
 from datetime import datetime
 import matplotlib.pyplot as plt
+
+
+import torch
+import random
+import numpy as np
+def set_seed(seed):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        torch.use_deterministic_algorithms(True)
+
 
 def plot_prediction_comparison(true_values, predicted_values, model_config):
     """Plot true vs predicted values and save the figure."""
@@ -70,6 +88,11 @@ def run_sl_based_trading_strategy(model_config):
         test_series, test_dates, test_bid_prices, test_ask_prices, test_news_sentiments = predictor.split_and_scale_data()
         predicted_values = predictor.generate_predictions(test_series)
         true_values = predictor.test_mid_prices[model_config.INPUT_CHUNK_LENGTH:]
+    elif model_config.MODEL_NAME == 'chronos':
+        predictor = ChronosFinancialForecastingModel(dataProcessor, model_config)
+        test_series, test_dates, test_bid_prices, test_ask_prices, test_news_sentiments = predictor.split_and_scale_data()
+        predicted_values = predictor.generate_predictions(test_series)
+        true_values = predictor.test_mid_prices[model_config.INPUT_CHUNK_LENGTH:]
     else:
         predictor = DartsFinancialForecastingModel(dataProcessor, model_config)
         train_series, valid_series, test_series, test_dates, test_bid_prices, test_ask_prices, test_news_sentiments = predictor.split_and_scale_data()
@@ -89,10 +112,10 @@ def run_sl_based_trading_strategy(model_config):
 
     # Group data by date for trading simulation
     chunked_values = group_data_by_date(
-        parsed_test_dates, 
-        true_values, 
+        parsed_test_dates,
+        true_values,
         predicted_values,
-        test_bid_prices, 
+        test_bid_prices,
         test_ask_prices,
         test_news_sentiments
     )
@@ -513,6 +536,7 @@ def print_model_config(config):
     print(f"  Output Directory          : {config.OUTPUT_DIR}")
 
 if __name__ == "__main__":
+    set_seed(25)
     parser = argparse.ArgumentParser()
     parser.add_argument("--wallet_a", type=float, default=100000.0, help="Amount of money in wallet A (currency A).")
     parser.add_argument("--wallet_b", type=float, default=100000.0, help="Amount of money in wallet B (currency B).")
@@ -527,7 +551,7 @@ if __name__ == "__main__":
     parser.add_argument("--input_chunk_length", type=int, default=64, help="Length of the input sequences.")
     parser.add_argument("--output_chunk_length", type=int, default=1, help="Length of the output sequences.")
     parser.add_argument("--n_epochs", type=int, default=50, help="Number of training epochs.")
-    parser.add_argument("--batch_size", type=int, default=1024, help="Batch size for training.")
+    parser.add_argument("--batch_size", type=int, default=64, help="Batch size for training.")
     parser.add_argument("--train_ratio", type=float, default=0.5, help="Ratio of training data used in the train/test split.")
     parser.add_argument("--data_path", type=str, default="", help="Path to the training data. Currency rates should be provided as 1 A / 1 B, where A and B are the respective currencies.", required=True)
     parser.add_argument("--use_frac_kelly", action="store_true", help="Use fractional Kelly to size bets. Default is False.")
@@ -536,4 +560,5 @@ if __name__ == "__main__":
     parser.add_argument("--output_dir", type=str, default="results/usd-cny-2023", help="Directory to save all outputs.")
 
     args = parser.parse_args()
+    
     run(args)

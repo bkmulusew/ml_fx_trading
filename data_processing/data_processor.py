@@ -22,8 +22,8 @@ class DataProcessor:
         bid_prices = df["bid_price"].tolist()
         ask_prices = df["ask_price"].tolist()
         news_sentiments = df["competitor_label"].tolist()
-        
-        if self.model_config.MODEL_NAME == 'toto':
+
+        if self.model_config.MODEL_NAME == 'toto' or self.model_config.MODEL_NAME == 'chronos':
             mid_price_series = df["mid_price"].values
         else:
             mid_price_series = TimeSeries.from_dataframe(df, value_cols=["mid_price"])
