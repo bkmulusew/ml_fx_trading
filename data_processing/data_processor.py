@@ -21,8 +21,7 @@ class DataProcessor:
         dates = df["date"].tolist()
         bid_prices = df["bid_price"].tolist()
         ask_prices = df["ask_price"].tolist()
-        with_prompt_values = df["with_prompt"].tolist()
-        without_prompt_values = df["without_prompt"].tolist()
+        news_sentiments = df["competitor_label"].tolist()
         
         if self.model_config.MODEL_NAME == 'toto':
             mid_price_series = df["mid_price"].values
@@ -34,6 +33,5 @@ class DataProcessor:
             bid_prices,
             ask_prices,
             mid_price_series,
-            with_prompt_values,
-            without_prompt_values
+            news_sentiments
         )

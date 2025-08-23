@@ -48,7 +48,7 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
     def split_and_scale_data(self, train_ratio=0.5, validation_ratio=0.1):
         """Prepare data with proper train/test split and no data leakage"""
         # Extract raw data
-        dates, bid_prices, ask_prices, mid_prices, with_prompt_values, without_prompt_values = self.data_processor.extract_price_time_series()
+        dates, bid_prices, ask_prices, mid_prices, news_sentiments = self.data_processor.extract_price_time_series()
 
         # Calculate indices for splitting
         n = len(mid_prices)
@@ -77,8 +77,7 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
             dates=dates[val_end:],
             bid_prices=bid_prices[val_end:],
             ask_prices=ask_prices[val_end:],
-            without_prompt=without_prompt_values[val_end:],
-            with_prompt=with_prompt_values[val_end:]
+            news_sentiments=news_sentiments[val_end:]
         )
 
         return (X_test_scaled, *meta)
