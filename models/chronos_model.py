@@ -6,7 +6,7 @@ from chronos import ChronosBoltPipeline
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 
 class ChronosFinancialForecastingModel(FinancialForecastingModel):
-    """Financial forecasting model using Amazon's Chronos, a pre-trained transformer for zero-shot forecasting"""
+    """Financial forecasting model using Amazon's Chronos-bolt, a pre-trained transformer for zero-shot forecasting"""
 
     def __init__(self, data_processor, model_config):
         self.data_processor = data_processor
