@@ -87,6 +87,9 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
         val_mid_prices = mid_prices["val"]
         test_mid_prices = mid_prices["test"]
 
+        test_mid_prices_pd_copy = test_mid_prices.pd_series(copy=True)
+        self.test_mid_prices = test_mid_prices_pd_copy[self.model_config.INPUT_CHUNK_LENGTH:].values.tolist()
+
         # Scale the series data
         scaled_series = self._scale_series_data(train_mid_prices, val_mid_prices, test_mid_prices)
         
@@ -143,10 +146,3 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
         predicted_values = tseries_predicted.values.tolist()
 
         return predicted_values
-
-    def get_true_values(self, test_series):
-        """Retrieves true values from the test series after scaling back."""
-        test_series_inverse = self.scaler.inverse_transform(test_series)
-        true_df = test_series_inverse.pd_series(copy=True)
-        true_values = true_df[self.model_config.INPUT_CHUNK_LENGTH:].values.tolist()
-        return true_values

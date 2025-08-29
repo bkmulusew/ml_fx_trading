@@ -40,7 +40,7 @@ class TradingStrategy():
         }
 
         self.min_trades_for_full_kelly = 30  # Minimum trades before using full Kelly
-        self.fixed_position_size = 1000  # Fixed position size for training
+        self.fixed_position_size = 10000  # Fixed position size for training
         self.kelly_fraction = 0.5 # Fraction of Kelly to use
         
         # Initialize XGBoost models with appropriate parameters
@@ -216,8 +216,7 @@ class TradingStrategy():
             self.num_losses[strategy_name] += 1
             self.total_losses[strategy_name] += abs(profit_in_curr_b)
     
-    def determine_trade_direction(self, strategy_name, base_pct_change, pred_pct_change, base_lower_band, 
-                                  base_upper_band, pred_lower_band, pred_upper_band, llm_sentiment):
+    def determine_trade_direction(self, strategy_name, base_pct_change, pred_pct_change, llm_sentiment):
         """Determine the trade direction based on strategy and ratio changes."""
         trade_direction = 'no_trade'
 
@@ -354,8 +353,8 @@ class TradingStrategy():
         base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
         
         # Calculate Bollinger bands
-        base_mas, base_stds, base_upper_bands, base_lower_bands = TradingUtils.calculate_bollinger_bands(base_pct_incs)
-        pred_mas, pred_stds, pred_upper_bands, pred_lower_bands = TradingUtils.calculate_bollinger_bands(pred_pct_incs)
+        # base_mas, base_stds, base_upper_bands, base_lower_bands = TradingUtils.calculate_bollinger_bands(base_pct_incs)
+        # pred_mas, pred_stds, pred_upper_bands, pred_lower_bands = TradingUtils.calculate_bollinger_bands(pred_pct_incs)
 
         for i in range(1, len(actual_rates)-1):
             feature = [
@@ -378,8 +377,8 @@ class TradingStrategy():
         base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
         
         # Calculate Bollinger bands
-        _, _, base_upper_bands, base_lower_bands = TradingUtils.calculate_bollinger_bands(base_pct_incs)
-        _, _, pred_upper_bands, pred_lower_bands = TradingUtils.calculate_bollinger_bands(pred_pct_incs)
+        # _, _, base_upper_bands, base_lower_bands = TradingUtils.calculate_bollinger_bands(base_pct_incs)
+        # _, _, pred_upper_bands, pred_lower_bands = TradingUtils.calculate_bollinger_bands(pred_pct_incs)
         
         for i in range(1, len(actual_rates) - 1):
             curr_bid_price = bid_prices[i]
@@ -387,10 +386,10 @@ class TradingStrategy():
 
             base_pct_inc = base_pct_incs[i]
             pred_pct_inc = pred_pct_incs[i]
-            base_lower_band = base_lower_bands[i]
-            base_upper_band = base_upper_bands[i]
-            pred_lower_band = pred_lower_bands[i]
-            pred_upper_band = pred_upper_bands[i]
+            # base_lower_band = base_lower_bands[i]
+            # base_upper_band = base_upper_bands[i]
+            # pred_lower_band = pred_lower_bands[i]
+            # pred_upper_band = pred_upper_bands[i]
             llm_sentiment = llm_sentiments[i]
 
             # Calculate Kelly fraction
@@ -398,8 +397,7 @@ class TradingStrategy():
             
             # Determine trade direction
             trade_direction = self.determine_trade_direction(
-                strategy_name, base_pct_inc, pred_pct_inc, base_lower_band, 
-                base_upper_band, pred_lower_band, pred_upper_band, llm_sentiment
+                strategy_name, base_pct_inc, pred_pct_inc, llm_sentiment
             )
 
             # Execute trade
@@ -411,8 +409,8 @@ class TradingStrategy():
         strategy_name = "ensemble"
         base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
         # Bollinger on base & pred pct
-        base_mas, base_stds, base_upper_bands, base_lower_bands = TradingUtils.calculate_bollinger_bands(base_pct_incs)
-        pred_mas, pred_stds, pred_upper_bands, pred_lower_bands = TradingUtils.calculate_bollinger_bands(pred_pct_incs)
+        # base_mas, base_stds, base_upper_bands, base_lower_bands = TradingUtils.calculate_bollinger_bands(base_pct_incs)
+        # pred_mas, pred_stds, pred_upper_bands, pred_lower_bands = TradingUtils.calculate_bollinger_bands(pred_pct_incs)
 
         classes = [0, 1, 2]
 

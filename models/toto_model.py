@@ -60,7 +60,7 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
         val_mid_prices = mid_prices["val"]
         test_mid_prices = mid_prices["test"]
 
-        self.test_mid_prices = test_mid_prices.tolist()
+        self.test_mid_prices = test_mid_prices[self.model_config.INPUT_CHUNK_LENGTH:].tolist()
 
         # Reshape for scaling (T, 1)
         X_train = train_mid_prices.reshape(-1, 1).astype(np.float32)
