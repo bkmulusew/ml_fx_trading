@@ -1,4 +1,3 @@
 from .base_model import FinancialForecastingModel
 from .darts_model import DartsFinancialForecastingModel
-from .pytorch_model import PytorchFinancialForecastingModel
 from .toto_model import TotoFinancialForecastingModel

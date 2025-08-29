@@ -51,7 +51,7 @@ The full list of flags and options for the python script is as follows:
 ```
 --wallet_a: Amount of money in wallet A (currency A).
 --wallet_b: Amount of money in wallet B (currency B).
---model_name: Specify the supervised learning model to use. Supported models include 'bilstm' for Bidirectional LSTM with attention, 'nbeats' for NBEATS, 'nhits' for NHiTS, 'transformer' for Transformer, and 'tcn' for Temporal Convolutional Network.
+--model_name: Specify the model to use. Supported models include 'nbeats' for NBEATS, 'nhits' for NHiTS, 'tcn' for Temporal Convolutional Network, and 'toto' for Toto.
 --input_chunk_length: Length of the input sequences.
 --output_chunk_length: Length of the output sequences.
 --n_epochs: Number of training epochs.

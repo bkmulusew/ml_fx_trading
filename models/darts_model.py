@@ -32,7 +32,6 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
                 "devices": [0]
                 },
             )
-
         elif model_name == "nhits":
             return NHiTSModel(
                 input_chunk_length=self.model_config.INPUT_CHUNK_LENGTH,
@@ -51,28 +50,6 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
                 "devices": [0]
                 },
             )
-
-        elif model_name == "transformer":
-            return TransformerModel(
-                input_chunk_length=self.model_config.INPUT_CHUNK_LENGTH,
-                output_chunk_length=self.model_config.OUTPUT_CHUNK_LENGTH,
-                n_epochs=self.model_config.N_EPOCHS,
-                batch_size=self.model_config.BATCH_SIZE,
-                nhead=4,
-                d_model=256,
-                num_encoder_layers = 3,
-                num_decoder_layers = 3,
-                dim_feedforward = 16,
-                norm_type = "LayerNormNoBias",
-                dropout=0.2,
-                model_name="transformer",
-                optimizer_kwargs={"lr": 0.0001},
-                pl_trainer_kwargs={
-                "accelerator": "gpu",
-                "devices": [0]
-                },
-            )
-
         elif model_name == "tcn":
             return TCNModel(
                 input_chunk_length=self.model_config.INPUT_CHUNK_LENGTH,
@@ -92,7 +69,6 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
                     "devices": [0]
                 }
             )
-
         else:
             raise ValueError("Invalid model name.")
 
