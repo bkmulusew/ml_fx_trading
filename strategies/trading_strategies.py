@@ -121,13 +121,42 @@ class TradingStrategy():
                 new_position_type = 'long' if trade_direction == 'buy_currency_a' else 'short' if trade_direction == 'sell_currency_a' else None
                 
                 if new_position_type is not None and new_position_type != current_position_type:
-                    self.close_position(strategy_name, sell_price, buy_price)
+                    if enable_transaction_costs:
+                        if self.open_positions[strategy_name]['type'] == 'long':
+                            if bid_price > self.open_positions[strategy_name]['entry_ratio']:
+                                self.close_position(strategy_name, sell_price, buy_price)
+                            else:
+                                self.trade_returns[strategy_name].append(0.0)
+                                return
+                        elif self.open_positions[strategy_name]['type'] == 'short':
+                            if ask_price < self.open_positions[strategy_name]['entry_ratio']:
+                                self.close_position(strategy_name, sell_price, buy_price)
+                            else:
+                                self.trade_returns[strategy_name].append(0.0)
+                                return
+                    else:
+                        self.close_position(strategy_name, sell_price, buy_price)
                 else:
                     # If same type or no trade, don't make a new trade
+                    self.trade_returns[strategy_name].append(0.0)
                     return
             else:
                 # If hold position is not enabled, close the position
-                self.close_position(strategy_name, sell_price, buy_price)
+                if enable_transaction_costs:
+                    if self.open_positions[strategy_name]['type'] == 'long':
+                        if bid_price > self.open_positions[strategy_name]['entry_ratio']:
+                            self.close_position(strategy_name, sell_price, buy_price)
+                        else:
+                            self.trade_returns[strategy_name].append(0.0)
+                            return
+                    elif self.open_positions[strategy_name]['type'] == 'short':
+                        if ask_price < self.open_positions[strategy_name]['entry_ratio']:
+                            self.close_position(strategy_name, sell_price, buy_price)
+                        else:
+                            self.trade_returns[strategy_name].append(0.0)
+                            return
+                else:
+                    self.close_position(strategy_name, sell_price, buy_price)
         
         # Then open new position if there's a trade signal and no matching position type
         if trade_direction != 'no_trade':

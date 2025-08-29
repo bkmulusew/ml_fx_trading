@@ -134,49 +134,49 @@ def run_sl_based_trading_strategy(model_config):
     news_sentiment_sharpe_ratios = []
     ensemble_sharpe_ratios = []
 
-    for _, values in chunked_values.items():
-        if (len(values['true_values']) < 7):
-            continue
+    # for _, values in chunked_values.items():
+    #     if (len(values['true_values']) < 7):
+    #         continue
 
-        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B)
-        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["news_sentiments"], enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS, hold_position=model_config.HOLD_POSITION)
-        mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
-        trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
-        forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])
-        hybrid_mean_reversion_profit.append(trading_strategy.total_profit_or_loss["hybrid_mean_reversion"])
-        hybrid_trend_profit.append(trading_strategy.total_profit_or_loss["hybrid_trend"])
-        news_sentiment_profit.append(trading_strategy.total_profit_or_loss["news_sentiment"])
-        ensemble_profit.append(trading_strategy.total_profit_or_loss["ensemble"])
-        mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["mean_reversion"] / trading_strategy.num_trades["mean_reversion"]
-        trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["trend"] / trading_strategy.num_trades["trend"]
-        forecasting_profit_per_trade_val = trading_strategy.total_profit_or_loss["pure_forcasting"] / trading_strategy.num_trades["pure_forcasting"]
-        hybrid_mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["hybrid_mean_reversion"] / trading_strategy.num_trades["hybrid_mean_reversion"]
-        hybrid_trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["hybrid_trend"] / trading_strategy.num_trades["hybrid_trend"]
-        news_sentiment_profit_per_trade_val = trading_strategy.total_profit_or_loss["news_sentiment"] / trading_strategy.num_trades["news_sentiment"]
-        ensemble_profit_per_trade_val = trading_strategy.total_profit_or_loss["ensemble"] / trading_strategy.num_trades["ensemble"]
-        mean_reversion_profit_per_trade.append(mean_reversion_profit_per_trade_val)
-        trend_profit_per_trade.append(trend_profit_per_trade_val)
-        forecasting_profit_per_trade.append(forecasting_profit_per_trade_val)
-        hybrid_mean_reversion_profit_per_trade.append(hybrid_mean_reversion_profit_per_trade_val)
-        hybrid_trend_profit_per_trade.append(hybrid_trend_profit_per_trade_val)
-        news_sentiment_profit_per_trade.append(news_sentiment_profit_per_trade_val)
-        ensemble_profit_per_trade.append(ensemble_profit_per_trade_val)
+    trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B)
+    trading_strategy.simulate_trading_with_strategies(true_values, predicted_values, test_bid_prices, test_ask_prices, test_news_sentiments, enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS, hold_position=model_config.HOLD_POSITION)
+    mean_reversion_profit.extend(trading_strategy.trade_returns["mean_reversion"])
+    trend_profit.extend(trading_strategy.trade_returns["trend"])
+    forecasting_profit.extend(trading_strategy.trade_returns["pure_forcasting"])
+    hybrid_mean_reversion_profit.extend(trading_strategy.trade_returns["hybrid_mean_reversion"])
+    hybrid_trend_profit.extend(trading_strategy.trade_returns["hybrid_trend"])
+    news_sentiment_profit.extend(trading_strategy.trade_returns["news_sentiment"])
+    ensemble_profit.extend(trading_strategy.trade_returns["ensemble"])
+    # mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["mean_reversion"] / trading_strategy.num_trades["mean_reversion"]
+    # trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["trend"] / trading_strategy.num_trades["trend"]
+    # forecasting_profit_per_trade_val = trading_strategy.total_profit_or_loss["pure_forcasting"] / trading_strategy.num_trades["pure_forcasting"]
+    # hybrid_mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["hybrid_mean_reversion"] / trading_strategy.num_trades["hybrid_mean_reversion"]
+    # hybrid_trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["hybrid_trend"] / trading_strategy.num_trades["hybrid_trend"]
+    # news_sentiment_profit_per_trade_val = trading_strategy.total_profit_or_loss["news_sentiment"] / trading_strategy.num_trades["news_sentiment"]
+    # ensemble_profit_per_trade_val = trading_strategy.total_profit_or_loss["ensemble"] / trading_strategy.num_trades["ensemble"]
+    # mean_reversion_profit_per_trade.append(mean_reversion_profit_per_trade_val)
+    # trend_profit_per_trade.append(trend_profit_per_trade_val)
+    # forecasting_profit_per_trade.append(forecasting_profit_per_trade_val)
+    # hybrid_mean_reversion_profit_per_trade.append(hybrid_mean_reversion_profit_per_trade_val)
+    # hybrid_trend_profit_per_trade.append(hybrid_trend_profit_per_trade_val)
+    # news_sentiment_profit_per_trade.append(news_sentiment_profit_per_trade_val)
+    # ensemble_profit_per_trade.append(ensemble_profit_per_trade_val)
 
-        mean_reversion_num_trades.append(trading_strategy.num_trades["mean_reversion"])
-        trend_num_trades.append(trading_strategy.num_trades["trend"])
-        forecasting_num_trades.append(trading_strategy.num_trades["pure_forcasting"])
-        hybrid_mean_reversion_num_trades.append(trading_strategy.num_trades["hybrid_mean_reversion"])
-        hybrid_trend_num_trades.append(trading_strategy.num_trades["hybrid_trend"])
-        news_sentiment_num_trades.append(trading_strategy.num_trades["news_sentiment"])
-        ensemble_num_trades.append(trading_strategy.num_trades["ensemble"])
+    # mean_reversion_num_trades.append(trading_strategy.num_trades["mean_reversion"])
+    # trend_num_trades.append(trading_strategy.num_trades["trend"])
+    # forecasting_num_trades.append(trading_strategy.num_trades["pure_forcasting"])
+    # hybrid_mean_reversion_num_trades.append(trading_strategy.num_trades["hybrid_mean_reversion"])
+    # hybrid_trend_num_trades.append(trading_strategy.num_trades["hybrid_trend"])
+    # news_sentiment_num_trades.append(trading_strategy.num_trades["news_sentiment"])
+    # ensemble_num_trades.append(trading_strategy.num_trades["ensemble"])
 
-        mean_reversion_sharpe_ratios.append(trading_strategy.sharpe_ratios["mean_reversion"])
-        trend_sharpe_ratios.append(trading_strategy.sharpe_ratios["trend"])
-        forecasting_sharpe_ratios.append(trading_strategy.sharpe_ratios["pure_forcasting"])
-        hybrid_mean_reversion_sharpe_ratios.append(trading_strategy.sharpe_ratios["hybrid_mean_reversion"])
-        hybrid_trend_sharpe_ratios.append(trading_strategy.sharpe_ratios["hybrid_trend"])
-        news_sentiment_sharpe_ratios.append(trading_strategy.sharpe_ratios["news_sentiment"])
-        ensemble_sharpe_ratios.append(trading_strategy.sharpe_ratios["ensemble"])
+    # mean_reversion_sharpe_ratios.append(trading_strategy.sharpe_ratios["mean_reversion"])
+    # trend_sharpe_ratios.append(trading_strategy.sharpe_ratios["trend"])
+    # forecasting_sharpe_ratios.append(trading_strategy.sharpe_ratios["pure_forcasting"])
+    # hybrid_mean_reversion_sharpe_ratios.append(trading_strategy.sharpe_ratios["hybrid_mean_reversion"])
+    # hybrid_trend_sharpe_ratios.append(trading_strategy.sharpe_ratios["hybrid_trend"])
+    # news_sentiment_sharpe_ratios.append(trading_strategy.sharpe_ratios["news_sentiment"])
+    # ensemble_sharpe_ratios.append(trading_strategy.sharpe_ratios["ensemble"])
             
     cumulative_mean_reversion_profit = np.cumsum(mean_reversion_profit)
     cumulative_trend_profit = np.cumsum(trend_profit)
@@ -186,42 +186,42 @@ def run_sl_based_trading_strategy(model_config):
     cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
     cumulative_ensemble_profit = np.cumsum(ensemble_profit)
 
-    cumulative_mean_reversion_profit_per_trade = [
-        np.sum(mean_reversion_profit[:i+1]) / np.sum(mean_reversion_num_trades[:i+1]) for i in range(len(mean_reversion_profit))
-    ]
-    cumulative_trend_profit_per_trade = [
-        np.sum(trend_profit[:i+1]) / np.sum(trend_num_trades[:i+1]) for i in range(len(trend_profit))
-    ]
-    cumulative_forecasting_profit_per_trade = [
-        np.sum(forecasting_profit[:i+1]) / np.sum(forecasting_num_trades[:i+1]) for i in range(len(forecasting_profit))
-    ]
-    cumulative_hybrid_mean_reversion_profit_per_trade = [
-        np.sum(hybrid_mean_reversion_profit[:i+1]) / np.sum(hybrid_mean_reversion_num_trades[:i+1]) for i in range(len(hybrid_mean_reversion_profit))
-    ]
-    cumulative_hybrid_trend_profit_per_trade = [
-        np.sum(hybrid_trend_profit[:i+1]) / np.sum(hybrid_trend_num_trades[:i+1]) for i in range(len(hybrid_trend_profit))
-    ]
-    cumulative_news_sentiment_profit_per_trade = [
-        np.sum(news_sentiment_profit[:i+1]) / np.sum(news_sentiment_num_trades[:i+1]) for i in range(len(news_sentiment_profit))
-    ]
-    cumulative_ensemble_profit_per_trade = [
-        np.sum(ensemble_profit[:i+1]) / np.sum(ensemble_num_trades[:i+1]) for i in range(len(ensemble_profit))
-    ]
+    # cumulative_mean_reversion_profit_per_trade = [
+    #     np.sum(mean_reversion_profit[:i+1]) / np.sum(mean_reversion_num_trades[:i+1]) for i in range(len(mean_reversion_profit))
+    # ]
+    # cumulative_trend_profit_per_trade = [
+    #     np.sum(trend_profit[:i+1]) / np.sum(trend_num_trades[:i+1]) for i in range(len(trend_profit))
+    # ]
+    # cumulative_forecasting_profit_per_trade = [
+    #     np.sum(forecasting_profit[:i+1]) / np.sum(forecasting_num_trades[:i+1]) for i in range(len(forecasting_profit))
+    # ]
+    # cumulative_hybrid_mean_reversion_profit_per_trade = [
+    #     np.sum(hybrid_mean_reversion_profit[:i+1]) / np.sum(hybrid_mean_reversion_num_trades[:i+1]) for i in range(len(hybrid_mean_reversion_profit))
+    # ]
+    # cumulative_hybrid_trend_profit_per_trade = [
+    #     np.sum(hybrid_trend_profit[:i+1]) / np.sum(hybrid_trend_num_trades[:i+1]) for i in range(len(hybrid_trend_profit))
+    # ]
+    # cumulative_news_sentiment_profit_per_trade = [
+    #     np.sum(news_sentiment_profit[:i+1]) / np.sum(news_sentiment_num_trades[:i+1]) for i in range(len(news_sentiment_profit))
+    # ]
+    # cumulative_ensemble_profit_per_trade = [
+    #     np.sum(ensemble_profit[:i+1]) / np.sum(ensemble_num_trades[:i+1]) for i in range(len(ensemble_profit))
+    # ]
 
-    plt.plot(cumulative_mean_reversion_profit_per_trade, color='purple', label='Cumulative Mean Reversion Profit Per Trade')
-    plt.plot(cumulative_trend_profit_per_trade, color='blue', label='Cumulative Trend Profit Per Trade')
-    plt.plot(cumulative_forecasting_profit_per_trade, color='red', label=f'Cumulative Forecasting Profit Per Trade {model_config.MODEL_NAME}')
-    plt.plot(cumulative_hybrid_mean_reversion_profit_per_trade, color='green', label='Cumulative Hybrid Mean Reversion Profit Per Trade')
-    plt.plot(cumulative_hybrid_trend_profit_per_trade, color='brown', label='Cumulative Hybrid Trend Profit Per Trade')
-    plt.plot(cumulative_news_sentiment_profit_per_trade, color='pink', label='Cumulative News Sentiment Profit Per Trade')
-    plt.plot(cumulative_ensemble_profit_per_trade, color='orange', label='Cumulative Ensemble Profit Per Trade')
-    plt.title('Cumulative Profits Per Trade Using Kelly')
-    plt.xlabel('Observation')
-    plt.ylabel('Cumulative Profit Per Trade')
-    plt.legend()
-    plt.savefig(f'{model_config.OUTPUT_DIR}/cumulative_profits_per_trade_kelly.png', dpi=300, bbox_inches='tight')
+    # plt.plot(cumulative_mean_reversion_profit_per_trade, color='purple', label='Cumulative Mean Reversion Profit Per Trade')
+    # plt.plot(cumulative_trend_profit_per_trade, color='blue', label='Cumulative Trend Profit Per Trade')
+    # plt.plot(cumulative_forecasting_profit_per_trade, color='red', label=f'Cumulative Forecasting Profit Per Trade {model_config.MODEL_NAME}')
+    # plt.plot(cumulative_hybrid_mean_reversion_profit_per_trade, color='green', label='Cumulative Hybrid Mean Reversion Profit Per Trade')
+    # plt.plot(cumulative_hybrid_trend_profit_per_trade, color='brown', label='Cumulative Hybrid Trend Profit Per Trade')
+    # plt.plot(cumulative_news_sentiment_profit_per_trade, color='pink', label='Cumulative News Sentiment Profit Per Trade')
+    # plt.plot(cumulative_ensemble_profit_per_trade, color='orange', label='Cumulative Ensemble Profit Per Trade')
+    # plt.title('Cumulative Profits Per Trade Using Kelly')
+    # plt.xlabel('Observation')
+    # plt.ylabel('Cumulative Profit Per Trade')
+    # plt.legend()
+    # plt.savefig(f'{model_config.OUTPUT_DIR}/cumulative_profits_per_trade_kelly.png', dpi=300, bbox_inches='tight')
 
-    plt.clf()
+    # plt.clf()
 
     plt.plot(cumulative_mean_reversion_profit, color='purple', label='Cumulative Mean Reversion Profit')
     plt.plot(cumulative_trend_profit, color='blue', label='Cumulative Trend Profit')
@@ -253,35 +253,35 @@ def run_sl_based_trading_strategy(model_config):
 
     plt.clf()
 
-    plt.plot(mean_reversion_profit_per_trade, color='purple', label='Mean Reversion Profit Per Trade')
-    plt.plot(trend_profit_per_trade, color='blue', label='Trend Profit Per Trade')
-    plt.plot(forecasting_profit_per_trade, color = 'red', label = f'Forcasting Profit Per Trade {model_config.MODEL_NAME}')
-    plt.plot(hybrid_mean_reversion_profit_per_trade, color='green', label='Hybrid Mean Reversion Profit Per Trade')
-    plt.plot(hybrid_trend_profit_per_trade, color='brown', label='Hybrid Trend Profit Per Trade')
-    plt.plot(news_sentiment_profit_per_trade, color='pink', label='News Sentiment Profit Per Trade')
-    plt.plot(ensemble_profit_per_trade, color='orange', label='Ensemble Profit Per Trade')
-    plt.title('Profit Per Trade Using Kelly')
-    plt.xlabel('Observation')
-    plt.ylabel('Profit Per Trade')
-    plt.legend()
-    plt.savefig(f'{model_config.OUTPUT_DIR}/profit_per_trade_kelly.png', dpi=300, bbox_inches='tight')
+    # plt.plot(mean_reversion_profit_per_trade, color='purple', label='Mean Reversion Profit Per Trade')
+    # plt.plot(trend_profit_per_trade, color='blue', label='Trend Profit Per Trade')
+    # plt.plot(forecasting_profit_per_trade, color = 'red', label = f'Forcasting Profit Per Trade {model_config.MODEL_NAME}')
+    # plt.plot(hybrid_mean_reversion_profit_per_trade, color='green', label='Hybrid Mean Reversion Profit Per Trade')
+    # plt.plot(hybrid_trend_profit_per_trade, color='brown', label='Hybrid Trend Profit Per Trade')
+    # plt.plot(news_sentiment_profit_per_trade, color='pink', label='News Sentiment Profit Per Trade')
+    # plt.plot(ensemble_profit_per_trade, color='orange', label='Ensemble Profit Per Trade')
+    # plt.title('Profit Per Trade Using Kelly')
+    # plt.xlabel('Observation')
+    # plt.ylabel('Profit Per Trade')
+    # plt.legend()
+    # plt.savefig(f'{model_config.OUTPUT_DIR}/profit_per_trade_kelly.png', dpi=300, bbox_inches='tight')
 
-    plt.clf()
+    # plt.clf()
 
-    plt.plot(mean_reversion_sharpe_ratios, color='purple', label='Mean Reversion Sharpe Ratio')
-    plt.plot(trend_sharpe_ratios, color='blue', label='Trend Sharpe Ratio')
-    plt.plot(forecasting_sharpe_ratios, color='red', label=f'Forecasting Sharpe Ratio {model_config.MODEL_NAME}')
-    plt.plot(hybrid_mean_reversion_sharpe_ratios, color='green', label='Hybrid Mean Reversion Sharpe Ratio')
-    plt.plot(hybrid_trend_sharpe_ratios, color='brown', label='Hybrid Trend Sharpe Ratio')
-    plt.plot(news_sentiment_sharpe_ratios, color='pink', label='News Sentiment Sharpe Ratio')
-    plt.plot(ensemble_sharpe_ratios, color='orange', label='Ensemble Sharpe Ratio')
-    plt.title('Sharpe Ratios Using Kelly')
-    plt.xlabel('Observation')
-    plt.ylabel('Sharpe Ratio')
-    plt.legend()
-    plt.savefig(f'{model_config.OUTPUT_DIR}/sharpe_ratios_kelly.png', dpi=300, bbox_inches='tight')
+    # plt.plot(mean_reversion_sharpe_ratios, color='purple', label='Mean Reversion Sharpe Ratio')
+    # plt.plot(trend_sharpe_ratios, color='blue', label='Trend Sharpe Ratio')
+    # plt.plot(forecasting_sharpe_ratios, color='red', label=f'Forecasting Sharpe Ratio {model_config.MODEL_NAME}')
+    # plt.plot(hybrid_mean_reversion_sharpe_ratios, color='green', label='Hybrid Mean Reversion Sharpe Ratio')
+    # plt.plot(hybrid_trend_sharpe_ratios, color='brown', label='Hybrid Trend Sharpe Ratio')
+    # plt.plot(news_sentiment_sharpe_ratios, color='pink', label='News Sentiment Sharpe Ratio')
+    # plt.plot(ensemble_sharpe_ratios, color='orange', label='Ensemble Sharpe Ratio')
+    # plt.title('Sharpe Ratios Using Kelly')
+    # plt.xlabel('Observation')
+    # plt.ylabel('Sharpe Ratio')
+    # plt.legend()
+    # plt.savefig(f'{model_config.OUTPUT_DIR}/sharpe_ratios_kelly.png', dpi=300, bbox_inches='tight')
 
-    plt.clf()
+    # plt.clf()
 
     # Use Fixed Position
     
@@ -322,49 +322,49 @@ def run_sl_based_trading_strategy(model_config):
     news_sentiment_sharpe_ratios = []
     ensemble_sharpe_ratios = []
 
-    for _, values in chunked_values.items():
-        if (len(values['true_values']) < 7):
-            continue
+    # for _, values in chunked_values.items():
+    #     if (len(values['true_values']) < 7):
+    #         continue
 
-        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B)
-        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["news_sentiments"], use_kelly=False, enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS, hold_position=model_config.HOLD_POSITION)
-        mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
-        trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
-        forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])
-        hybrid_mean_reversion_profit.append(trading_strategy.total_profit_or_loss["hybrid_mean_reversion"])
-        hybrid_trend_profit.append(trading_strategy.total_profit_or_loss["hybrid_trend"])
-        news_sentiment_profit.append(trading_strategy.total_profit_or_loss["news_sentiment"])
-        ensemble_profit.append(trading_strategy.total_profit_or_loss["ensemble"])
-        mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["mean_reversion"] / trading_strategy.num_trades["mean_reversion"]
-        trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["trend"] / trading_strategy.num_trades["trend"]
-        forecasting_profit_per_trade_val = trading_strategy.total_profit_or_loss["pure_forcasting"] / trading_strategy.num_trades["pure_forcasting"]
-        hybrid_mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["hybrid_mean_reversion"] / trading_strategy.num_trades["hybrid_mean_reversion"]
-        hybrid_trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["hybrid_trend"] / trading_strategy.num_trades["hybrid_trend"]
-        news_sentiment_profit_per_trade_val = trading_strategy.total_profit_or_loss["news_sentiment"] / trading_strategy.num_trades["news_sentiment"]
-        ensemble_profit_per_trade_val = trading_strategy.total_profit_or_loss["ensemble"] / trading_strategy.num_trades["ensemble"]
-        mean_reversion_profit_per_trade.append(mean_reversion_profit_per_trade_val)
-        trend_profit_per_trade.append(trend_profit_per_trade_val)
-        forecasting_profit_per_trade.append(forecasting_profit_per_trade_val)
-        hybrid_mean_reversion_profit_per_trade.append(hybrid_mean_reversion_profit_per_trade_val)
-        hybrid_trend_profit_per_trade.append(hybrid_trend_profit_per_trade_val)
-        news_sentiment_profit_per_trade.append(news_sentiment_profit_per_trade_val)
-        ensemble_profit_per_trade.append(ensemble_profit_per_trade_val)
+    trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B)
+    trading_strategy.simulate_trading_with_strategies(true_values, predicted_values, test_bid_prices, test_ask_prices, test_news_sentiments, use_kelly=False, enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS, hold_position=model_config.HOLD_POSITION)
+    mean_reversion_profit.extend(trading_strategy.trade_returns["mean_reversion"])
+    trend_profit.extend(trading_strategy.trade_returns["trend"])
+    forecasting_profit.extend(trading_strategy.trade_returns["pure_forcasting"])
+    hybrid_mean_reversion_profit.extend(trading_strategy.trade_returns["hybrid_mean_reversion"])
+    hybrid_trend_profit.extend(trading_strategy.trade_returns["hybrid_trend"])
+    news_sentiment_profit.extend(trading_strategy.trade_returns["news_sentiment"])
+    ensemble_profit.extend(trading_strategy.trade_returns["ensemble"])
+    # mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["mean_reversion"] / trading_strategy.num_trades["mean_reversion"]
+    # trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["trend"] / trading_strategy.num_trades["trend"]
+    # forecasting_profit_per_trade_val = trading_strategy.total_profit_or_loss["pure_forcasting"] / trading_strategy.num_trades["pure_forcasting"]
+    # hybrid_mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["hybrid_mean_reversion"] / trading_strategy.num_trades["hybrid_mean_reversion"]
+    # hybrid_trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["hybrid_trend"] / trading_strategy.num_trades["hybrid_trend"]
+    # news_sentiment_profit_per_trade_val = trading_strategy.total_profit_or_loss["news_sentiment"] / trading_strategy.num_trades["news_sentiment"]
+    # ensemble_profit_per_trade_val = trading_strategy.total_profit_or_loss["ensemble"] / trading_strategy.num_trades["ensemble"]
+    # mean_reversion_profit_per_trade.append(mean_reversion_profit_per_trade_val)
+    # trend_profit_per_trade.append(trend_profit_per_trade_val)
+    # forecasting_profit_per_trade.append(forecasting_profit_per_trade_val)
+    # hybrid_mean_reversion_profit_per_trade.append(hybrid_mean_reversion_profit_per_trade_val)
+    # hybrid_trend_profit_per_trade.append(hybrid_trend_profit_per_trade_val)
+    # news_sentiment_profit_per_trade.append(news_sentiment_profit_per_trade_val)
+    # ensemble_profit_per_trade.append(ensemble_profit_per_trade_val)
 
-        mean_reversion_num_trades.append(trading_strategy.num_trades["mean_reversion"])
-        trend_num_trades.append(trading_strategy.num_trades["trend"])
-        forecasting_num_trades.append(trading_strategy.num_trades["pure_forcasting"])
-        hybrid_mean_reversion_num_trades.append(trading_strategy.num_trades["hybrid_mean_reversion"])
-        hybrid_trend_num_trades.append(trading_strategy.num_trades["hybrid_trend"])
-        news_sentiment_num_trades.append(trading_strategy.num_trades["news_sentiment"])
-        ensemble_num_trades.append(trading_strategy.num_trades["ensemble"])
+    # mean_reversion_num_trades.append(trading_strategy.num_trades["mean_reversion"])
+    # trend_num_trades.append(trading_strategy.num_trades["trend"])
+    # forecasting_num_trades.append(trading_strategy.num_trades["pure_forcasting"])
+    # hybrid_mean_reversion_num_trades.append(trading_strategy.num_trades["hybrid_mean_reversion"])
+    # hybrid_trend_num_trades.append(trading_strategy.num_trades["hybrid_trend"])
+    # news_sentiment_num_trades.append(trading_strategy.num_trades["news_sentiment"])
+    # ensemble_num_trades.append(trading_strategy.num_trades["ensemble"])
 
-        mean_reversion_sharpe_ratios.append(trading_strategy.sharpe_ratios["mean_reversion"])
-        trend_sharpe_ratios.append(trading_strategy.sharpe_ratios["trend"])
-        forecasting_sharpe_ratios.append(trading_strategy.sharpe_ratios["pure_forcasting"])
-        hybrid_mean_reversion_sharpe_ratios.append(trading_strategy.sharpe_ratios["hybrid_mean_reversion"])
-        hybrid_trend_sharpe_ratios.append(trading_strategy.sharpe_ratios["hybrid_trend"])
-        news_sentiment_sharpe_ratios.append(trading_strategy.sharpe_ratios["news_sentiment"])
-        ensemble_sharpe_ratios.append(trading_strategy.sharpe_ratios["ensemble"])
+    # mean_reversion_sharpe_ratios.append(trading_strategy.sharpe_ratios["mean_reversion"])
+    # trend_sharpe_ratios.append(trading_strategy.sharpe_ratios["trend"])
+    # forecasting_sharpe_ratios.append(trading_strategy.sharpe_ratios["pure_forcasting"])
+    # hybrid_mean_reversion_sharpe_ratios.append(trading_strategy.sharpe_ratios["hybrid_mean_reversion"])
+    # hybrid_trend_sharpe_ratios.append(trading_strategy.sharpe_ratios["hybrid_trend"])
+    # news_sentiment_sharpe_ratios.append(trading_strategy.sharpe_ratios["news_sentiment"])
+    # ensemble_sharpe_ratios.append(trading_strategy.sharpe_ratios["ensemble"])
             
     cumulative_mean_reversion_profit = np.cumsum(mean_reversion_profit)
     cumulative_trend_profit = np.cumsum(trend_profit)
@@ -374,42 +374,42 @@ def run_sl_based_trading_strategy(model_config):
     cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
     cumulative_ensemble_profit = np.cumsum(ensemble_profit)
 
-    cumulative_mean_reversion_profit_per_trade = [
-        np.sum(mean_reversion_profit[:i+1]) / np.sum(mean_reversion_num_trades[:i+1]) for i in range(len(mean_reversion_profit))
-    ]
-    cumulative_trend_profit_per_trade = [
-        np.sum(trend_profit[:i+1]) / np.sum(trend_num_trades[:i+1]) for i in range(len(trend_profit))
-    ]
-    cumulative_forecasting_profit_per_trade = [
-        np.sum(forecasting_profit[:i+1]) / np.sum(forecasting_num_trades[:i+1]) for i in range(len(forecasting_profit))
-    ]
-    cumulative_hybrid_mean_reversion_profit_per_trade = [
-        np.sum(hybrid_mean_reversion_profit[:i+1]) / np.sum(hybrid_mean_reversion_num_trades[:i+1]) for i in range(len(hybrid_mean_reversion_profit))
-    ]
-    cumulative_hybrid_trend_profit_per_trade = [
-        np.sum(hybrid_trend_profit[:i+1]) / np.sum(hybrid_trend_num_trades[:i+1]) for i in range(len(hybrid_trend_profit))
-    ]
-    cumulative_news_sentiment_profit_per_trade = [
-        np.sum(news_sentiment_profit[:i+1]) / np.sum(news_sentiment_num_trades[:i+1]) for i in range(len(news_sentiment_profit))
-    ]
-    cumulative_ensemble_profit_per_trade = [
-        np.sum(ensemble_profit[:i+1]) / np.sum(ensemble_num_trades[:i+1]) for i in range(len(ensemble_profit))
-    ]
+    # cumulative_mean_reversion_profit_per_trade = [
+    #     np.sum(mean_reversion_profit[:i+1]) / np.sum(mean_reversion_num_trades[:i+1]) for i in range(len(mean_reversion_profit))
+    # ]
+    # cumulative_trend_profit_per_trade = [
+    #     np.sum(trend_profit[:i+1]) / np.sum(trend_num_trades[:i+1]) for i in range(len(trend_profit))
+    # ]
+    # cumulative_forecasting_profit_per_trade = [
+    #     np.sum(forecasting_profit[:i+1]) / np.sum(forecasting_num_trades[:i+1]) for i in range(len(forecasting_profit))
+    # ]
+    # cumulative_hybrid_mean_reversion_profit_per_trade = [
+    #     np.sum(hybrid_mean_reversion_profit[:i+1]) / np.sum(hybrid_mean_reversion_num_trades[:i+1]) for i in range(len(hybrid_mean_reversion_profit))
+    # ]
+    # cumulative_hybrid_trend_profit_per_trade = [
+    #     np.sum(hybrid_trend_profit[:i+1]) / np.sum(hybrid_trend_num_trades[:i+1]) for i in range(len(hybrid_trend_profit))
+    # ]
+    # cumulative_news_sentiment_profit_per_trade = [
+    #     np.sum(news_sentiment_profit[:i+1]) / np.sum(news_sentiment_num_trades[:i+1]) for i in range(len(news_sentiment_profit))
+    # ]
+    # cumulative_ensemble_profit_per_trade = [
+    #     np.sum(ensemble_profit[:i+1]) / np.sum(ensemble_num_trades[:i+1]) for i in range(len(ensemble_profit))
+    # ]
 
-    plt.plot(cumulative_mean_reversion_profit_per_trade, color='purple', label='Cumulative Mean Reversion Profit Per Trade')
-    plt.plot(cumulative_trend_profit_per_trade, color='blue', label='Cumulative Trend Profit Per Trade')
-    plt.plot(cumulative_forecasting_profit_per_trade, color='red', label=f'Cumulative Forecasting Profit Per Trade {model_config.MODEL_NAME}')
-    plt.plot(cumulative_hybrid_mean_reversion_profit_per_trade, color='green', label='Cumulative Hybrid Mean Reversion Profit Per Trade')
-    plt.plot(cumulative_hybrid_trend_profit_per_trade, color='brown', label='Cumulative Hybrid Trend Profit Per Trade')
-    plt.plot(cumulative_news_sentiment_profit_per_trade, color='pink', label='Cumulative News Sentiment Profit Per Trade')
-    plt.plot(cumulative_ensemble_profit_per_trade, color='orange', label='Cumulative Ensemble Profit Per Trade')
-    plt.title('Cumulative Profits Per Trade Using Fixed Postion Size')
-    plt.xlabel('Observation')
-    plt.ylabel('Cumulative Profit Per Trade')
-    plt.legend()
-    plt.savefig(f'{model_config.OUTPUT_DIR}/cumulative_profits_per_trade_fixed.png', dpi=300, bbox_inches='tight')
+    # plt.plot(cumulative_mean_reversion_profit_per_trade, color='purple', label='Cumulative Mean Reversion Profit Per Trade')
+    # plt.plot(cumulative_trend_profit_per_trade, color='blue', label='Cumulative Trend Profit Per Trade')
+    # plt.plot(cumulative_forecasting_profit_per_trade, color='red', label=f'Cumulative Forecasting Profit Per Trade {model_config.MODEL_NAME}')
+    # plt.plot(cumulative_hybrid_mean_reversion_profit_per_trade, color='green', label='Cumulative Hybrid Mean Reversion Profit Per Trade')
+    # plt.plot(cumulative_hybrid_trend_profit_per_trade, color='brown', label='Cumulative Hybrid Trend Profit Per Trade')
+    # plt.plot(cumulative_news_sentiment_profit_per_trade, color='pink', label='Cumulative News Sentiment Profit Per Trade')
+    # plt.plot(cumulative_ensemble_profit_per_trade, color='orange', label='Cumulative Ensemble Profit Per Trade')
+    # plt.title('Cumulative Profits Per Trade Using Fixed Postion Size')
+    # plt.xlabel('Observation')
+    # plt.ylabel('Cumulative Profit Per Trade')
+    # plt.legend()
+    # plt.savefig(f'{model_config.OUTPUT_DIR}/cumulative_profits_per_trade_fixed.png', dpi=300, bbox_inches='tight')
 
-    plt.clf()
+    # plt.clf()
 
     plt.plot(cumulative_mean_reversion_profit, color='purple', label='Cumulative Mean Reversion Profit')
     plt.plot(cumulative_trend_profit, color='blue', label='Cumulative Trend Profit')
@@ -441,35 +441,35 @@ def run_sl_based_trading_strategy(model_config):
 
     plt.clf()
 
-    plt.plot(mean_reversion_profit_per_trade, color='purple', label='Mean Reversion Profit Per Trade')
-    plt.plot(trend_profit_per_trade, color='blue', label='Trend Profit Per Trade')
-    plt.plot(forecasting_profit_per_trade, color = 'red', label = f'Forcasting Profit Per Trade {model_config.MODEL_NAME}')
-    plt.plot(hybrid_mean_reversion_profit_per_trade, color='green', label='Hybrid Mean Reversion Profit Per Trade')
-    plt.plot(hybrid_trend_profit_per_trade, color='brown', label='Hybrid Trend Profit Per Trade')
-    plt.plot(news_sentiment_profit_per_trade, color='pink', label='News Sentiment Profit Per Trade')
-    plt.plot(ensemble_profit_per_trade, color='orange', label='Ensemble Profit Per Trade')
-    plt.title('Profit Per Trade Using Fixed Postion Size')
-    plt.xlabel('Observation')
-    plt.ylabel('Profit Per Trade')
-    plt.legend()
-    plt.savefig(f'{model_config.OUTPUT_DIR}/profit_per_trade_fixed.png', dpi=300, bbox_inches='tight')
+    # plt.plot(mean_reversion_profit_per_trade, color='purple', label='Mean Reversion Profit Per Trade')
+    # plt.plot(trend_profit_per_trade, color='blue', label='Trend Profit Per Trade')
+    # plt.plot(forecasting_profit_per_trade, color = 'red', label = f'Forcasting Profit Per Trade {model_config.MODEL_NAME}')
+    # plt.plot(hybrid_mean_reversion_profit_per_trade, color='green', label='Hybrid Mean Reversion Profit Per Trade')
+    # plt.plot(hybrid_trend_profit_per_trade, color='brown', label='Hybrid Trend Profit Per Trade')
+    # plt.plot(news_sentiment_profit_per_trade, color='pink', label='News Sentiment Profit Per Trade')
+    # plt.plot(ensemble_profit_per_trade, color='orange', label='Ensemble Profit Per Trade')
+    # plt.title('Profit Per Trade Using Fixed Postion Size')
+    # plt.xlabel('Observation')
+    # plt.ylabel('Profit Per Trade')
+    # plt.legend()
+    # plt.savefig(f'{model_config.OUTPUT_DIR}/profit_per_trade_fixed.png', dpi=300, bbox_inches='tight')
 
-    plt.clf()
+    # plt.clf()
 
-    plt.plot(mean_reversion_sharpe_ratios, color='purple', label='Mean Reversion Sharpe Ratio')
-    plt.plot(trend_sharpe_ratios, color='blue', label='Trend Sharpe Ratio')
-    plt.plot(forecasting_sharpe_ratios, color='red', label=f'Forecasting Sharpe Ratio {model_config.MODEL_NAME}')
-    plt.plot(hybrid_mean_reversion_sharpe_ratios, color='green', label='Hybrid Mean Reversion Sharpe Ratio')
-    plt.plot(hybrid_trend_sharpe_ratios, color='brown', label='Hybrid Trend Sharpe Ratio')
-    plt.plot(news_sentiment_sharpe_ratios, color='pink', label='News Sentiment Sharpe Ratio')
-    plt.plot(ensemble_sharpe_ratios, color='orange', label='Ensemble Sharpe Ratio')
-    plt.title('Sharpe Ratios Using Fixed Postion Size')
-    plt.xlabel('Observation')
-    plt.ylabel('Sharpe Ratio')
-    plt.legend()
-    plt.savefig(f'{model_config.OUTPUT_DIR}/sharpe_ratios_fixed.png', dpi=300, bbox_inches='tight')
+    # plt.plot(mean_reversion_sharpe_ratios, color='purple', label='Mean Reversion Sharpe Ratio')
+    # plt.plot(trend_sharpe_ratios, color='blue', label='Trend Sharpe Ratio')
+    # plt.plot(forecasting_sharpe_ratios, color='red', label=f'Forecasting Sharpe Ratio {model_config.MODEL_NAME}')
+    # plt.plot(hybrid_mean_reversion_sharpe_ratios, color='green', label='Hybrid Mean Reversion Sharpe Ratio')
+    # plt.plot(hybrid_trend_sharpe_ratios, color='brown', label='Hybrid Trend Sharpe Ratio')
+    # plt.plot(news_sentiment_sharpe_ratios, color='pink', label='News Sentiment Sharpe Ratio')
+    # plt.plot(ensemble_sharpe_ratios, color='orange', label='Ensemble Sharpe Ratio')
+    # plt.title('Sharpe Ratios Using Fixed Postion Size')
+    # plt.xlabel('Observation')
+    # plt.ylabel('Sharpe Ratio')
+    # plt.legend()
+    # plt.savefig(f'{model_config.OUTPUT_DIR}/sharpe_ratios_fixed.png', dpi=300, bbox_inches='tight')
 
-    plt.clf()
+    # plt.clf()
 
 def run(args):
     """Parse command-line arguments and configure the trading model, then run the trading strategy."""
