@@ -97,38 +97,32 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
             raise ValueError("Invalid model name.")
 
 
-    def split_and_scale_data(self, train_ratio=0.5, validation_ratio=0.1):
+    def split_and_scale_data(self):
         """Splits the data into training, validation, and test sets and applies scaling."""
-        dates, bid_prices, ask_prices, mid_price, news_sentiments = self.data_processor.extract_price_time_series()
+        data = self.data_processor.prepare_fx_data()
 
-        # Calculate indices for splitting
-        num_observations = len(mid_price)
-        train_end_index = int(num_observations * train_ratio)
-        validation_end_index = int(num_observations * (train_ratio + validation_ratio))
+        dates = data["dates"]
+        bid_prices = data["bid_prices"]
+        ask_prices = data["ask_prices"]
+        news_sentiments = data["news_sentiments"]
 
-        # Split mid price series into train/validation/test
-        train_series, val_series, test_series = self._split_mid_price_series(mid_price, train_end_index, validation_end_index)
+        mid_prices = data["mid_price_series"]
+        train_mid_prices = mid_prices["train"]
+        val_mid_prices = mid_prices["val"]
+        test_mid_prices = mid_prices["test"]
 
         # Scale the series data
-        scaled_series = self._scale_series_data(train_series, val_series, test_series)
+        scaled_series = self._scale_series_data(train_mid_prices, val_mid_prices, test_mid_prices)
         
         # Process test data
         test_data = self._process_test_data(
-            dates=dates[validation_end_index:],
-            bid_prices=bid_prices[validation_end_index:],
-            ask_prices=ask_prices[validation_end_index:],
-            news_sentiments=news_sentiments[validation_end_index:]
+            dates=dates,
+            bid_prices=bid_prices,
+            ask_prices=ask_prices,
+            news_sentiments=news_sentiments
         )
 
         return (*scaled_series, *test_data)
-    
-    def _split_mid_price_series(self, mid_price, train_end, validation_end):
-        """Split the mid price series into train, validation, and test sets."""
-        return (
-            mid_price[:train_end],
-            mid_price[train_end:validation_end],
-            mid_price[validation_end:]
-        )
     
     def _process_test_data(self, **test_series):
         """Process all test data series by applying the input chunk length offset."""

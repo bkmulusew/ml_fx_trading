@@ -478,8 +478,9 @@ def run(args):
     model_config.OUTPUT_CHUNK_LENGTH = args.output_chunk_length
     model_config.N_EPOCHS = args.n_epochs
     model_config.BATCH_SIZE = args.batch_size
-    model_config.TRAIN_RATIO = args.train_ratio
-    model_config.DATA_FILE_PATH = args.data_path
+    model_config.DATA_PATH_TRAIN = args.data_path_train
+    model_config.DATA_PATH_VAL = args.data_path_val
+    model_config.DATA_PATH_TEST = args.data_path_test
     model_config.WALLET_A = args.wallet_a
     model_config.WALLET_B = args.wallet_b
     model_config.HOLD_POSITION = args.hold_position
@@ -503,8 +504,9 @@ def print_model_config(config):
     print(f"  Output Chunk Length       : {config.OUTPUT_CHUNK_LENGTH}")
     print(f"  Number of Epochs          : {config.N_EPOCHS}")
     print(f"  Batch Size                : {config.BATCH_SIZE}")
-    print(f"  Train Ratio               : {config.TRAIN_RATIO}")
-    print(f"  Data File Path            : {config.DATA_FILE_PATH}")
+    print(f"  Data Path Train           : {config.DATA_PATH_TRAIN}")
+    print(f"  Data Path Val             : {config.DATA_PATH_VAL}")
+    print(f"  Data Path Test            : {config.DATA_PATH_TEST}")
     print(f"  Wallet A Initial Amount   : {config.WALLET_A}")
     print(f"  Wallet B Initial Amount   : {config.WALLET_B}")
     print(f"  Hold Position Enabled     : {config.HOLD_POSITION}")
@@ -528,8 +530,9 @@ if __name__ == "__main__":
     parser.add_argument("--output_chunk_length", type=int, default=1, help="Length of the output sequences.")
     parser.add_argument("--n_epochs", type=int, default=50, help="Number of training epochs.")
     parser.add_argument("--batch_size", type=int, default=1024, help="Batch size for training.")
-    parser.add_argument("--train_ratio", type=float, default=0.5, help="Ratio of training data used in the train/test split.")
-    parser.add_argument("--data_path", type=str, default="", help="Path to the training data. Currency rates should be provided as 1 A / 1 B, where A and B are the respective currencies.", required=True)
+    parser.add_argument("--data_path_train", type=str, default="", help="Path to the training data. Currency rates should be provided as 1 A / 1 B, where A and B are the respective currencies.", required=True)
+    parser.add_argument("--data_path_val", type=str, default="", help="Path to the validation data. Currency rates should be provided as 1 A / 1 B, where A and B are the respective currencies.", required=True)
+    parser.add_argument("--data_path_test", type=str, default="", help="Path to the test data. Currency rates should be provided as 1 A / 1 B, where A and B are the respective currencies.", required=True)
     parser.add_argument("--use_frac_kelly", action="store_true", help="Use fractional Kelly to size bets. Default is False.")
     parser.add_argument("--enable_transaction_costs", action="store_true", help="Enable transaction costs. Default is False.")
     parser.add_argument("--hold_position", action="store_true", help="Enable holding position. Default is False.")
