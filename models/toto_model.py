@@ -45,22 +45,22 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
             print(f"Error loading Toto model: {e}")
             raise
 
-    def split_and_scale_data(self, train_ratio=0.5, validation_ratio=0.1):
+    def split_and_scale_data(self):
         """Prepare data with proper train/test split and no data leakage"""
         # Extract raw data
-        dates, bid_prices, ask_prices, mid_prices, news_sentiments = self.data_processor.extract_price_time_series()
+        data = self.data_processor.prepare_fx_data()
 
-        # Calculate indices for splitting
-        n = len(mid_prices)
-        train_end = int(n * train_ratio)
-        val_end = int(n * (train_ratio + validation_ratio))
+        dates = data["dates"]
+        bid_prices = data["bid_prices"]
+        ask_prices = data["ask_prices"]
+        news_sentiments = data["news_sentiments"]
 
-        # Split mid prices series
-        train_mid_prices = mid_prices[:train_end]
-        val_mid_prices = mid_prices[train_end:val_end]
-        test_mid_prices = mid_prices[val_end:]
+        mid_prices = data["mid_price_series"]
+        train_mid_prices = mid_prices["train"]
+        val_mid_prices = mid_prices["val"]
+        test_mid_prices = mid_prices["test"]
 
-        self.test_mid_prices = mid_prices[val_end:].tolist()
+        self.test_mid_prices = test_mid_prices[self.model_config.INPUT_CHUNK_LENGTH:].tolist()
 
         # Reshape for scaling (T, 1)
         X_train = train_mid_prices.reshape(-1, 1).astype(np.float32)
@@ -74,10 +74,10 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
 
         # Process test data
         meta = self._align_test_targets(
-            dates=dates[val_end:],
-            bid_prices=bid_prices[val_end:],
-            ask_prices=ask_prices[val_end:],
-            news_sentiments=news_sentiments[val_end:]
+            dates=dates,
+            bid_prices=bid_prices,
+            ask_prices=ask_prices,
+            news_sentiments=news_sentiments
         )
 
         return (X_test_scaled, *meta)
