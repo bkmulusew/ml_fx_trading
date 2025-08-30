@@ -3,7 +3,7 @@ import os
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 from utils import ModelConfig
 from data_processing import DataProcessor
-from models import DartsFinancialForecastingModel, ChronosFinancialForecastingModel, TotoFinancialForecastingModel#, PytorchFinancialForecastingModel
+from models import DartsFinancialForecastingModel, ChronosFinancialForecastingModel, TotoFinancialForecastingModel
 from metrics import ModelEvaluationMetrics
 from matplotlib import pyplot as plt
 import numpy as np
@@ -76,29 +76,22 @@ def run_sl_based_trading_strategy(model_config):
     dataProcessor = DataProcessor(model_config)
 
     # Train model and get predictions
-    if model_config.MODEL_NAME == 'bilstm':
-        predictor = PytorchFinancialForecastingModel(dataProcessor, model_config)
-        processed_data = predictor.split_and_scale_data()
-        predictor.train(processed_data['x_train'], processed_data['y_train'], processed_data['x_valid'], processed_data['y_valid'])
-        generated_values = predictor.generate_predictions(processed_data['x_test'], processed_data['y_test'])
-        predicted_values = generated_values['predicted_values']
-        true_values = generated_values['true_values']
-    elif model_config.MODEL_NAME == 'toto':
+    if model_config.MODEL_NAME == 'toto':
         predictor = TotoFinancialForecastingModel(dataProcessor, model_config)
         test_series, test_dates, test_bid_prices, test_ask_prices, test_news_sentiments = predictor.split_and_scale_data()
         predicted_values = predictor.generate_predictions(test_series)
-        true_values = predictor.test_mid_prices[model_config.INPUT_CHUNK_LENGTH:]
+        true_values = predictor.test_mid_prices
     elif model_config.MODEL_NAME == 'chronos':
         predictor = ChronosFinancialForecastingModel(dataProcessor, model_config)
         test_series, test_dates, test_bid_prices, test_ask_prices, test_news_sentiments = predictor.split_and_scale_data()
         predicted_values = predictor.generate_predictions(test_series)
-        true_values = predictor.test_mid_prices[model_config.INPUT_CHUNK_LENGTH:]
+        true_values = predictor.test_mid_prices
     else:
         predictor = DartsFinancialForecastingModel(dataProcessor, model_config)
         train_series, valid_series, test_series, test_dates, test_bid_prices, test_ask_prices, test_news_sentiments = predictor.split_and_scale_data()
         predictor.train(train_series, valid_series)
         predicted_values = predictor.generate_predictions(test_series)
-        true_values = predictor.get_true_values(test_series)
+        true_values = predictor.test_mid_prices
 
     # Calculate and print the prediction error.
     print(f"Model: {model_config.MODEL_NAME}")
@@ -501,8 +494,9 @@ def run(args):
     model_config.OUTPUT_CHUNK_LENGTH = args.output_chunk_length
     model_config.N_EPOCHS = args.n_epochs
     model_config.BATCH_SIZE = args.batch_size
-    model_config.TRAIN_RATIO = args.train_ratio
-    model_config.DATA_FILE_PATH = args.data_path
+    model_config.DATA_PATH_TRAIN = args.data_path_train
+    model_config.DATA_PATH_VAL = args.data_path_val
+    model_config.DATA_PATH_TEST = args.data_path_test
     model_config.WALLET_A = args.wallet_a
     model_config.WALLET_B = args.wallet_b
     model_config.HOLD_POSITION = args.hold_position
@@ -526,8 +520,9 @@ def print_model_config(config):
     print(f"  Output Chunk Length       : {config.OUTPUT_CHUNK_LENGTH}")
     print(f"  Number of Epochs          : {config.N_EPOCHS}")
     print(f"  Batch Size                : {config.BATCH_SIZE}")
-    print(f"  Train Ratio               : {config.TRAIN_RATIO}")
-    print(f"  Data File Path            : {config.DATA_FILE_PATH}")
+    print(f"  Data Path Train           : {config.DATA_PATH_TRAIN}")
+    print(f"  Data Path Val             : {config.DATA_PATH_VAL}")
+    print(f"  Data Path Test            : {config.DATA_PATH_TEST}")
     print(f"  Wallet A Initial Amount   : {config.WALLET_A}")
     print(f"  Wallet B Initial Amount   : {config.WALLET_B}")
     print(f"  Hold Position Enabled     : {config.HOLD_POSITION}")
@@ -538,22 +533,22 @@ def print_model_config(config):
 if __name__ == "__main__":
     set_seed(25)
     parser = argparse.ArgumentParser()
-    parser.add_argument("--wallet_a", type=float, default=100000.0, help="Amount of money in wallet A (currency A).")
-    parser.add_argument("--wallet_b", type=float, default=100000.0, help="Amount of money in wallet B (currency B).")
+    parser.add_argument("--wallet_a", type=float, default=1000000.0, help="Amount of money in wallet A (currency A).")
+    parser.add_argument("--wallet_b", type=float, default=1000000.0, help="Amount of money in wallet B (currency B).")
     parser.add_argument(
         "--model_name",
         type=str,
         default="tcn",
-        help="Specify the supervised learning model to use. Supported models include 'bilstm' for Bidirectional LSTM with attention, \
-            'nbeats' for NBEATS, 'nhits' for NHiTS, 'transformer' for Transformer, and 'tcn' for Temporal Convolutional Network. \
+        help="Specify the model to use. Supported models include 'nbeats' for NBEATS, 'nhits' for NHiTS, 'tcn' for Temporal Convolutional Network, and 'toto' for Toto. \
             Default is 'tcn'."
     )
     parser.add_argument("--input_chunk_length", type=int, default=64, help="Length of the input sequences.")
     parser.add_argument("--output_chunk_length", type=int, default=1, help="Length of the output sequences.")
     parser.add_argument("--n_epochs", type=int, default=50, help="Number of training epochs.")
-    parser.add_argument("--batch_size", type=int, default=64, help="Batch size for training.")
-    parser.add_argument("--train_ratio", type=float, default=0.5, help="Ratio of training data used in the train/test split.")
-    parser.add_argument("--data_path", type=str, default="", help="Path to the training data. Currency rates should be provided as 1 A / 1 B, where A and B are the respective currencies.", required=True)
+    parser.add_argument("--batch_size", type=int, default=1024, help="Batch size for training.")
+    parser.add_argument("--data_path_train", type=str, default="", help="Path to the training data. Currency rates should be provided as 1 A / 1 B, where A and B are the respective currencies.", required=True)
+    parser.add_argument("--data_path_val", type=str, default="", help="Path to the validation data. Currency rates should be provided as 1 A / 1 B, where A and B are the respective currencies.", required=True)
+    parser.add_argument("--data_path_test", type=str, default="", help="Path to the test data. Currency rates should be provided as 1 A / 1 B, where A and B are the respective currencies.", required=True)
     parser.add_argument("--use_frac_kelly", action="store_true", help="Use fractional Kelly to size bets. Default is False.")
     parser.add_argument("--enable_transaction_costs", action="store_true", help="Enable transaction costs. Default is False.")
     parser.add_argument("--hold_position", action="store_true", help="Enable holding position. Default is False.")

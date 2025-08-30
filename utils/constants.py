@@ -7,8 +7,9 @@ class ModelConfig:
     OUTPUT_CHUNK_LENGTH: int = 1
     N_EPOCHS: int = 3
     BATCH_SIZE: int = 1024
-    DATA_FILE_PATH: str = "ml_fx_trading/dataset/exchange_rate.csv"
-    TRAIN_RATIO: float = 0.5
+    DATA_PATH_TRAIN: str = "ml_fx_trading/dataset/exchange_rate-train.csv"
+    DATA_PATH_VAL: str = "ml_fx_trading/dataset/exchange_rate-val.csv"
+    DATA_PATH_TEST: str = "ml_fx_trading/dataset/exchange_rate-test.csv"
     WALLET_A: float = 10000.0
     WALLET_B: float = 10000.0
     USE_FRAC_KELLY: bool = True

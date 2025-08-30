@@ -4,34 +4,41 @@ from darts import TimeSeries
 class DataProcessor:
     def __init__(self, model_config):
         self.model_config = model_config
-        self.data_df = None
 
-    def load_and_prepare_data(self):
+    def load_data(self):
         """Loads the CSV file and calculates the ratio if not already done."""
-        if self.data_df is None:
-            self.data_df = pd.read_csv(self.model_config.DATA_FILE_PATH)
-        return self.data_df
+        data_df_train = pd.read_csv(self.model_config.DATA_PATH_TRAIN)
+        data_df_val = pd.read_csv(self.model_config.DATA_PATH_VAL)
+        data_df_test = pd.read_csv(self.model_config.DATA_PATH_TEST)
+        return data_df_train, data_df_val, data_df_test
 
-    def extract_price_time_series(self):
+    def prepare_fx_data(self):
         """Extracts price related data from the DataFrame."""
-        
-        df = self.load_and_prepare_data()
+        data_df_train, data_df_val, data_df_test = self.load_data()
         
         # Extract data into respective lists
-        dates = df["date"].tolist()
-        bid_prices = df["bid_price"].tolist()
-        ask_prices = df["ask_price"].tolist()
-        news_sentiments = df["competitor_label"].tolist()
-
+        dates = data_df_test["date"].tolist()
+        bid_prices = data_df_test["bid_price"].tolist()
+        ask_prices = data_df_test["ask_price"].tolist()
+        news_sentiments = data_df_test["competitor_label"].tolist()
+        
         if self.model_config.MODEL_NAME == 'toto' or self.model_config.MODEL_NAME == 'chronos':
-            mid_price_series = df["mid_price"].values
+            mid_price_series_train = data_df_train["mid_price"].values
+            mid_price_series_val = data_df_val["mid_price"].values
+            mid_price_series_test = data_df_test["mid_price"].values
         else:
-            mid_price_series = TimeSeries.from_dataframe(df, value_cols=["mid_price"])
+            mid_price_series_train = TimeSeries.from_dataframe(data_df_train, value_cols=["mid_price"])
+            mid_price_series_val = TimeSeries.from_dataframe(data_df_val, value_cols=["mid_price"])
+            mid_price_series_test = TimeSeries.from_dataframe(data_df_test, value_cols=["mid_price"])
 
-        return (
-            dates,
-            bid_prices,
-            ask_prices,
-            mid_price_series,
-            news_sentiments
-        )
+        return {
+            "dates": dates,
+            "bid_prices": bid_prices,
+            "ask_prices": ask_prices,
+            "mid_price_series": {
+                "train": mid_price_series_train,
+                "val": mid_price_series_val,
+                "test": mid_price_series_test,
+            },
+            "news_sentiments": news_sentiments,
+        }
