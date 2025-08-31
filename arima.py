@@ -20,54 +20,50 @@ if not rpackages.isinstalled('forecast'):
 forecast = rpackages.importr('forecast')
 
 
-def backtest_arfima_strategy(prices, train_size=200, initial_capital=10000, position_size=1):
+def backtest_arfima_strategy(prices, train_size=300000, initial_capital=10000, position_size=1):
     forecast_pkg = rpackages.importr('forecast')
     forecast_fn = robjects.r['forecast']
 
-    preds = []
-    actuals = []
-    signals = []  # 1 = long, -1 = short, 0 = hold
+    # === Fixed training set ===
+    train = prices.iloc[:train_size]
+    test = prices.iloc[train_size:]
+
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    with localconverter(default_converter + pandas2ri.converter):
+        r_train = pandas2ri.py2rpy(train)
+
+    # Fit ARFIMA once
+    arfima_model = forecast_pkg.arfima(r_train)
+    print("????????????????????????????")
+    # Forecast the entire remaining horizon at once
+    fc = forecast_fn(arfima_model, h=len(test))
+    preds = np.array(fc.rx2('mean'))
+
+    # Align with test index
+    preds = pd.Series(preds, index=test.index)
+    actuals = test
+
+    # Trading signals
+    signals = []
     capital = initial_capital
-    positions = 0
     equity_curve = []
 
-    for i in range(train_size, len(prices)):
-        train = prices.iloc[i-train_size:i]
-        test_value = prices.iloc[i]
-
-        # Convert to R object
-        with localconverter(default_converter + pandas2ri.converter):
-            r_train = pandas2ri.py2rpy(train)
-
-        # Fit ARFIMA
-        arfima_model = forecast_pkg.arfima(r_train)
-
-        # Forecast 1 step ahead
-        fc = forecast_fn(arfima_model, h=1)
-        pred = float(np.array(fc.rx2('mean'))[0])
-
-        preds.append(pred)
-        actuals.append(test_value)
-
-        # Trading signal: long if prediction > current, short if prediction < current
-        if pred > train.iloc[-1]:
+    for i in range(len(test)):
+        if preds.iloc[i] > prices.iloc[train_size + i - 1]:
             signal = 1
-        elif pred < train.iloc[-1]:
+        elif preds.iloc[i] < prices.iloc[train_size + i - 1]:
             signal = -1
         else:
             signal = 0
-
         signals.append(signal)
 
-        # Simulate trade outcome
-        daily_return = (test_value - train.iloc[-1]) / train.iloc[-1] * signal
-        capital *= (1 + daily_return * position_size)  # position_size = leverage fraction
+        # Simulate trade
+        daily_return = (actuals.iloc[i] - prices.iloc[train_size + i - 1]) / prices.iloc[train_size + i - 1] * signal
+        capital *= (1 + daily_return * position_size)
         equity_curve.append(capital)
 
-    preds = pd.Series(preds, index=prices.index[train_size:])
-    actuals = pd.Series(actuals, index=prices.index[train_size:])
-    signals = pd.Series(signals, index=prices.index[train_size:])
-    equity_curve = pd.Series(equity_curve, index=prices.index[train_size:])
+    signals = pd.Series(signals, index=test.index)
+    equity_curve = pd.Series(equity_curve, index=test.index)
 
     # Accuracy metrics
     rmse = np.sqrt(mean_squared_error(actuals, preds))
@@ -81,6 +77,7 @@ def backtest_arfima_strategy(prices, train_size=200, initial_capital=10000, posi
         "rmse": rmse,
         "mae": mae
     }
+    
 
 
 def plot_acf_pacf_arima010(series, lags=40):
@@ -103,12 +100,12 @@ if __name__ == "__main__":
 
     mid = df[df.columns[2]]
     mid = mid[~mid.index.duplicated(keep='first')]
-    diff_mid = mid.diff().dropna()
-    from statsmodels.tsa.stattools import adfuller
+    #diff_mid = mid.diff().dropna()
+    #from statsmodels.tsa.stattools import adfuller
 
-    result = adfuller(diff_mid)
-    print(f'ADF Statistic: {result[0]}')
-    print(f'p-value: {result[1]}')
+    #result = adfuller(diff_mid)
+    #print(f'ADF Statistic: {result[0]}')
+    #print(f'p-value: {result[1]}')
 
     results = backtest_arfima_strategy(mid)
 
