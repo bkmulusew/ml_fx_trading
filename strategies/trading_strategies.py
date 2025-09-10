@@ -300,14 +300,6 @@ class TradingStrategy():
         n_classes = 3
         total_real = len(y_real)
 
-        # Weight = total_real / (n_classes * count_of_class)
-        # base_w = np.empty_like(y, dtype=np.float32)
-        # for i, yy in enumerate(y):
-        #     if real_mask[i]:
-        #         base_w[i] = total_real / (n_classes * cls_counts[yy])
-        #     else:
-        #         base_w[i] = 1e-6  # tiny weight for synthetic rows
-
         # ----- Sample weights -----
         # Only assign tiny weights to synthetic samples, leave real samples at default weight (1.0)
         base_w = np.ones(len(y), dtype=np.float32)  # Default weight = 1.0 for all
@@ -351,16 +343,11 @@ class TradingStrategy():
     def _generate_training_data(self, actual_rates, pred_rates, llm_sentiments):
         X, y = [], []
         base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
-        
-        # Calculate Bollinger bands
-        # base_mas, base_stds, base_upper_bands, base_lower_bands = TradingUtils.calculate_bollinger_bands(base_pct_incs)
-        # pred_mas, pred_stds, pred_upper_bands, pred_lower_bands = TradingUtils.calculate_bollinger_bands(pred_pct_incs)
 
         for i in range(1, len(actual_rates)-1):
             feature = [
                 self.label_mapping["buy_currency_a"] if base_pct_incs[i] < 0 else self.label_mapping["sell_currency_a"] if base_pct_incs[i] > 0 else self.label_mapping["no_trade"],
                 self.label_mapping["buy_currency_a"] if pred_pct_incs[i] > 0 else self.label_mapping["sell_currency_a"] if pred_pct_incs[i] < 0 else self.label_mapping["no_trade"],
-                self.label_mapping["buy_currency_a"] if llm_sentiments[i] == -1 else self.label_mapping["sell_currency_a"] if llm_sentiments[i] == 1 else self.label_mapping["no_trade"],
             ]
             X.append(feature)
 
@@ -376,20 +363,12 @@ class TradingStrategy():
         """Helper method to execute trading for a specific strategy."""
         base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
         
-        # Calculate Bollinger bands
-        # _, _, base_upper_bands, base_lower_bands = TradingUtils.calculate_bollinger_bands(base_pct_incs)
-        # _, _, pred_upper_bands, pred_lower_bands = TradingUtils.calculate_bollinger_bands(pred_pct_incs)
-        
         for i in range(1, len(actual_rates) - 1):
             curr_bid_price = bid_prices[i]
             curr_ask_price = ask_prices[i]
 
             base_pct_inc = base_pct_incs[i]
             pred_pct_inc = pred_pct_incs[i]
-            # base_lower_band = base_lower_bands[i]
-            # base_upper_band = base_upper_bands[i]
-            # pred_lower_band = pred_lower_bands[i]
-            # pred_upper_band = pred_upper_bands[i]
             llm_sentiment = llm_sentiments[i]
 
             # Calculate Kelly fraction
@@ -404,13 +383,10 @@ class TradingStrategy():
             self.execute_trade(strategy_name, trade_direction, curr_bid_price, curr_ask_price, 
                                          f_i, use_kelly, enable_transaction_costs, hold_position)
 
-    def _execute_ensemble_strategy(self, actual_rates, pred_rates, bid_prices, ask_prices, llm_sentiments, use_kelly, enable_transaction_costs, hold_position, min_conf=0.0):
+    def _execute_ensemble_strategy(self, actual_rates, pred_rates, bid_prices, ask_prices, use_kelly, enable_transaction_costs, hold_position, min_conf=0.0):
         """Helper method to execute ensemble trading strategy."""
         strategy_name = "ensemble"
         base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
-        # Bollinger on base & pred pct
-        # base_mas, base_stds, base_upper_bands, base_lower_bands = TradingUtils.calculate_bollinger_bands(base_pct_incs)
-        # pred_mas, pred_stds, pred_upper_bands, pred_lower_bands = TradingUtils.calculate_bollinger_bands(pred_pct_incs)
 
         classes = [0, 1, 2]
 
@@ -418,7 +394,6 @@ class TradingStrategy():
             feature = [
                 self.label_mapping["buy_currency_a"] if base_pct_incs[i] < 0 else self.label_mapping["sell_currency_a"] if base_pct_incs[i] > 0 else self.label_mapping["no_trade"],
                 self.label_mapping["buy_currency_a"] if pred_pct_incs[i] > 0 else self.label_mapping["sell_currency_a"] if pred_pct_incs[i] < 0 else self.label_mapping["no_trade"],
-                self.label_mapping["buy_currency_a"] if llm_sentiments[i] == -1 else self.label_mapping["sell_currency_a"] if llm_sentiments[i] == 1 else self.label_mapping["no_trade"],
             ]
 
             # Get ensemble prediction
@@ -489,7 +464,7 @@ class TradingStrategy():
         # Phase 3: Execute trading strategies
         print("Executing ensemble strategy...")
         self._execute_ensemble_strategy(actual_rates_test, pred_rates_test, bid_prices_test, 
-                                       ask_prices_test, llm_sentiments_test, use_kelly, enable_transaction_costs, hold_position)
+                                       ask_prices_test, use_kelly, enable_transaction_costs, hold_position)
         
         print("Executing base strategies...")
         base_strategy_names = ['mean_reversion', 'trend', 'pure_forcasting', 'hybrid_mean_reversion', 'hybrid_trend', 'news_sentiment']
