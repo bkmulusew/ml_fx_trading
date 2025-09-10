@@ -30,14 +30,17 @@ class TradingStrategy():
 
         # New: Track open positions
         self.open_positions = {
-            'mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
-            'trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
-            'pure_forcasting': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
-            'hybrid_mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
-            'hybrid_trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
-            'news_sentiment': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
-            'ensemble': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
+            'mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0},
+            'trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0},
+            'pure_forcasting': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0},
+            'hybrid_mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0},
+            'hybrid_trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0},
+            'news_sentiment': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0},
+            'ensemble': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0},
         }
+
+        # Minimum hold bars for news sentiment strategy
+        self.min_hold_bars = {'news_sentiment': 3}
 
         self.min_trades_for_full_kelly = 30  # Minimum trades before using full Kelly
         self.fixed_position_size = 10000  # Fixed position size for training
@@ -103,7 +106,7 @@ class TradingStrategy():
 
         return f
 
-    def execute_trade(self, strategy_name, trade_direction, bid_price, ask_price, f_i, use_kelly, enable_transaction_costs, hold_position):
+    def execute_trade(self, strategy_name, trade_direction, bid_price, ask_price, f_i, use_kelly, enable_transaction_costs):
         """Calculate profit/loss and handle position management"""
         # Determine pricing based on transaction costs setting
         if enable_transaction_costs:
@@ -113,21 +116,17 @@ class TradingStrategy():
             mid_price = (bid_price + ask_price) / 2
             buy_price = sell_price = mid_price
         
+        position = self.open_positions[strategy_name]
+
         # Check if there's an open position
-        if self.open_positions[strategy_name]['type'] is not None:
-            if hold_position:
-                # If new trade direction is different from current position type, close the position
-                current_position_type = self.open_positions[strategy_name]['type']
-                new_position_type = 'long' if trade_direction == 'buy_currency_a' else 'short' if trade_direction == 'sell_currency_a' else None
-                
-                if new_position_type is not None and new_position_type != current_position_type:
-                    self.close_position(strategy_name, sell_price, buy_price)
-                else:
-                    # If same type or no trade, don't make a new trade
+        if position['type'] is not None:
+            if strategy_name == 'news_sentiment':
+                min_hold_bars = self.min_hold_bars[strategy_name]
+                if position['bars_held'] < min_hold_bars:
+                    position['bars_held'] += 1
                     return
-            else:
-                # If hold position is not enabled, close the position
-                self.close_position(strategy_name, sell_price, buy_price)
+            # Close the position
+            self.close_position(strategy_name, sell_price, buy_price)
         
         # Then open new position if there's a trade signal and no matching position type
         if trade_direction != 'no_trade':
@@ -152,7 +151,8 @@ class TradingStrategy():
                         'type': 'long',
                         'size_a': bet_size_a,
                         'size_b': bet_size_b,
-                        'entry_ratio': buy_price
+                        'entry_ratio': buy_price,
+                        'bars_held': 0
                     }
                 else:
                     print(f"Not enough B to buy {bet_size_a} currency A")
@@ -169,7 +169,8 @@ class TradingStrategy():
                         'type': 'short',
                         'size_a': bet_size_a,
                         'size_b': bet_size_b,
-                        'entry_ratio': sell_price
+                        'entry_ratio': sell_price,
+                        'bars_held': 0
                     }
                 else:
                     print(f"Not enough A to sell {bet_size_a} currency A")
@@ -202,7 +203,7 @@ class TradingStrategy():
             self.wallet_a[strategy_name] += position['size_a']
         
         # Reset position tracking
-        self.open_positions[strategy_name] = {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0}
+        self.open_positions[strategy_name] = {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0}
 
         # Update profit tracking
         self.num_trades[strategy_name] += 1
@@ -359,7 +360,7 @@ class TradingStrategy():
         return list(zip(X, y))
         
     def _execute_trading_strategy(self, strategy_name, actual_rates, pred_rates, bid_prices, ask_prices, 
-                                 llm_sentiments, use_kelly, enable_transaction_costs, hold_position):
+                                 llm_sentiments, use_kelly, enable_transaction_costs):
         """Helper method to execute trading for a specific strategy."""
         base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
         
@@ -381,9 +382,9 @@ class TradingStrategy():
 
             # Execute trade
             self.execute_trade(strategy_name, trade_direction, curr_bid_price, curr_ask_price, 
-                                         f_i, use_kelly, enable_transaction_costs, hold_position)
+                                         f_i, use_kelly, enable_transaction_costs)
 
-    def _execute_ensemble_strategy(self, actual_rates, pred_rates, bid_prices, ask_prices, use_kelly, enable_transaction_costs, hold_position, min_conf=0.0):
+    def _execute_ensemble_strategy(self, actual_rates, pred_rates, bid_prices, ask_prices, use_kelly, enable_transaction_costs, min_conf=0.0):
         """Helper method to execute ensemble trading strategy."""
         strategy_name = "ensemble"
         base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
@@ -422,12 +423,13 @@ class TradingStrategy():
             # Calculate Kelly fraction and execute trade
             f_i = self.kelly_criterion(strategy_name)
             self.execute_trade(strategy_name, trade_direction, curr_bid_price, curr_ask_price, 
-                                         f_i, use_kelly, enable_transaction_costs, hold_position)
+                                         f_i, use_kelly, enable_transaction_costs)
         
     def _close_all_remaining_positions(self, strategy_names, bid_prices, ask_prices, enable_transaction_costs):
         """Helper method to close any remaining open positions for all strategies."""
         for strategy_name in strategy_names:
-            if self.open_positions[strategy_name]['type'] is not None:
+            position = self.open_positions[strategy_name]
+            if position['type'] is not None:
                 sell_price = bid_prices[-1]
                 buy_price = ask_prices[-1]
                 
@@ -437,7 +439,7 @@ class TradingStrategy():
                     
                 self.close_position(strategy_name, sell_price, buy_price)
 
-    def simulate_trading_with_strategies(self, actual_rates, pred_rates, bid_prices, ask_prices, llm_sentiments, use_kelly=True, enable_transaction_costs=False, hold_position=False):
+    def simulate_trading_with_strategies(self, actual_rates, pred_rates, bid_prices, ask_prices, llm_sentiments, use_kelly=True, enable_transaction_costs=False):
         """Simulate trading over a series of exchange rates using different strategies."""
 
         strategy_name = "ensemble"
@@ -464,13 +466,13 @@ class TradingStrategy():
         # Phase 3: Execute trading strategies
         print("Executing ensemble strategy...")
         self._execute_ensemble_strategy(actual_rates_test, pred_rates_test, bid_prices_test, 
-                                       ask_prices_test, use_kelly, enable_transaction_costs, hold_position)
+                                       ask_prices_test, use_kelly, enable_transaction_costs)
         
         print("Executing base strategies...")
         base_strategy_names = ['mean_reversion', 'trend', 'pure_forcasting', 'hybrid_mean_reversion', 'hybrid_trend', 'news_sentiment']
         for strategy_name in base_strategy_names:
             self._execute_trading_strategy(strategy_name, actual_rates_test, pred_rates_test, 
-                                         bid_prices_test, ask_prices_test, llm_sentiments_test, use_kelly, enable_transaction_costs, hold_position)
+                                         bid_prices_test, ask_prices_test, llm_sentiments_test, use_kelly, enable_transaction_costs)
             
          # Phase 4: Close remaining positions and calculate results
         all_strategy_names = base_strategy_names + ['ensemble']

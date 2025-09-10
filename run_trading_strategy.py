@@ -132,7 +132,7 @@ def run_sl_based_trading_strategy(model_config):
             continue
 
         trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B)
-        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["news_sentiments"], enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS, hold_position=model_config.HOLD_POSITION)
+        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["news_sentiments"], enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS)
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
         forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])
@@ -178,6 +178,8 @@ def run_sl_based_trading_strategy(model_config):
     cumulative_hybrid_trend_profit = np.cumsum(hybrid_trend_profit)
     cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
     cumulative_ensemble_profit = np.cumsum(ensemble_profit)
+
+    print(f"Cummulative News Sentiment Profit: {cumulative_news_sentiment_profit[-1]}")
 
     cumulative_mean_reversion_profit_per_trade = [
         np.sum(mean_reversion_profit[:i+1]) / np.sum(mean_reversion_num_trades[:i+1]) for i in range(len(mean_reversion_profit))
@@ -320,7 +322,7 @@ def run_sl_based_trading_strategy(model_config):
             continue
 
         trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B)
-        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["news_sentiments"], use_kelly=False, enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS, hold_position=model_config.HOLD_POSITION)
+        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["news_sentiments"], use_kelly=False, enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS)
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
         forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])
@@ -366,6 +368,8 @@ def run_sl_based_trading_strategy(model_config):
     cumulative_hybrid_trend_profit = np.cumsum(hybrid_trend_profit)
     cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
     cumulative_ensemble_profit = np.cumsum(ensemble_profit)
+
+    print(f"Cummulative News Sentiment Profit: {cumulative_news_sentiment_profit[-1]}")
 
     cumulative_mean_reversion_profit_per_trade = [
         np.sum(mean_reversion_profit[:i+1]) / np.sum(mean_reversion_num_trades[:i+1]) for i in range(len(mean_reversion_profit))
@@ -476,7 +480,6 @@ def run(args):
     model_config.DATA_PATH_TEST = args.data_path_test
     model_config.WALLET_A = args.wallet_a
     model_config.WALLET_B = args.wallet_b
-    model_config.HOLD_POSITION = args.hold_position
     model_config.USE_FRAC_KELLY = args.use_frac_kelly
     model_config.ENABLE_TRANSACTION_COSTS = args.enable_transaction_costs
 
@@ -502,7 +505,6 @@ def print_model_config(config):
     print(f"  Data Path Test            : {config.DATA_PATH_TEST}")
     print(f"  Wallet A Initial Amount   : {config.WALLET_A}")
     print(f"  Wallet B Initial Amount   : {config.WALLET_B}")
-    print(f"  Hold Position Enabled     : {config.HOLD_POSITION}")
     print(f"  Fractional Kelly Enabled  : {config.USE_FRAC_KELLY}")
     print(f"  Transaction Costs Enabled : {config.ENABLE_TRANSACTION_COSTS}")
     print(f"  Output Directory          : {config.OUTPUT_DIR}")
@@ -527,7 +529,6 @@ if __name__ == "__main__":
     parser.add_argument("--data_path_test", type=str, default="", help="Path to the test data. Currency rates should be provided as 1 A / 1 B, where A and B are the respective currencies.", required=True)
     parser.add_argument("--use_frac_kelly", action="store_true", help="Use fractional Kelly to size bets. Default is False.")
     parser.add_argument("--enable_transaction_costs", action="store_true", help="Enable transaction costs. Default is False.")
-    parser.add_argument("--hold_position", action="store_true", help="Enable holding position. Default is False.")
     parser.add_argument("--output_dir", type=str, default="results/usd-cny-2023", help="Directory to save all outputs.")
 
     args = parser.parse_args()

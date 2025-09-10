@@ -61,6 +61,5 @@ The full list of flags and options for the python script is as follows:
 --data_path_test: Path to the test data.
 --use_frac_kelly: Enable fractional kelly to size bets.
 --enable_transaction_costs: Enable transaction costs.
---hold_position: Enable holding position.
 --output_dir: Directory to save all outputs.
 ```
