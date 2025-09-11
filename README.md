@@ -62,4 +62,5 @@ The full list of flags and options for the python script is as follows:
 --use_frac_kelly: Enable fractional kelly to size bets.
 --enable_transaction_costs: Enable transaction costs.
 --output_dir: Directory to save all outputs.
+--news-min-hold-bars: Minimum number of bars to hold news_sentiment positions before allowing exit.
 ```
