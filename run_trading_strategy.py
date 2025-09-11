@@ -483,6 +483,7 @@ def run(args):
     model_config.USE_FRAC_KELLY = args.use_frac_kelly
     model_config.ENABLE_TRANSACTION_COSTS = args.enable_transaction_costs
     model_config.NEWS_MIN_HOLD_BARS = args.news_min_hold_bars
+    model_config.SENTIMENT_SOURCE = args.sentiment_source
 
     root_dir = os.path.dirname(os.path.abspath(__file__))
     model_config.OUTPUT_DIR = os.path.join(root_dir, args.output_dir)
@@ -510,6 +511,7 @@ def print_model_config(config):
     print(f"  Transaction Costs Enabled : {config.ENABLE_TRANSACTION_COSTS}")
     print(f"  Output Directory          : {config.OUTPUT_DIR}")
     print(f"  News Min Hold Bars        : {config.NEWS_MIN_HOLD_BARS}")
+    print(f"  Sentiment Source          : {config.SENTIMENT_SOURCE}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -518,9 +520,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model_name",
         type=str,
+        choices=[
+            "nbeats",
+            "nhits",
+            "tcn",
+            "toto"
+        ],
         default="tcn",
-        help="Specify the model to use. Supported models include 'nbeats' for NBEATS, 'nhits' for NHiTS, 'tcn' for Temporal Convolutional Network, and 'toto' for Toto. \
-            Default is 'tcn'."
+        help="Specify the model to use. Default is 'tcn'."
     )
     parser.add_argument("--input_chunk_length", type=int, default=64, help="Length of the input sequences.")
     parser.add_argument("--output_chunk_length", type=int, default=1, help="Length of the output sequences.")
@@ -537,6 +544,18 @@ if __name__ == "__main__":
         type=int,
         default=3,
         help="Minimum number of bars to hold news_sentiment positions before allowing exit.",
+    )
+    parser.add_argument(
+        "--sentiment_source",
+        type=str,
+        choices=[
+            "expert_llm_prompt_label",
+            "naive_prompt_label",
+            "competitor_label",
+            "naive_plus_prompt_converted_label"
+        ],
+        default="competitor_label",
+        help="Choose which sentiment label column to use for trading."
     )
 
     args = parser.parse_args()

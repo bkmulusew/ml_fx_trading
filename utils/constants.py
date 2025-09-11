@@ -16,3 +16,4 @@ class ModelConfig:
     ENABLE_TRANSACTION_COSTS: bool = False
     OUTPUT_DIR: str = "results/usd-cny-2023"
     NEWS_MIN_HOLD_BARS: int = 3
+    SENTIMENT_SOURCE: str = "competitor_label"

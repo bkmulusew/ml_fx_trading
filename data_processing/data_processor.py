@@ -20,7 +20,7 @@ class DataProcessor:
         dates = data_df_test["date"].tolist()
         bid_prices = data_df_test["bid_price"].tolist()
         ask_prices = data_df_test["ask_price"].tolist()
-        news_sentiments = data_df_test["competitor_label"].tolist()
+        news_sentiments = data_df_test[self.model_config.SENTIMENT_SOURCE].tolist()
         
         if self.model_config.MODEL_NAME == 'toto':
             mid_price_series_train = data_df_train["mid_price"].values

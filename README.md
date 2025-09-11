@@ -63,4 +63,5 @@ The full list of flags and options for the python script is as follows:
 --enable_transaction_costs: Enable transaction costs.
 --output_dir: Directory to save all outputs.
 --news-min-hold-bars: Minimum number of bars to hold news_sentiment positions before allowing exit.
+--sentiment_source: Choose which sentiment label column to use for trading. Options: expert_llm_prompt_label, naive_prompt_label, competitor_label, naive_plus_prompt_converted_label.  
 ```
