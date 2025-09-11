@@ -131,8 +131,8 @@ def run_sl_based_trading_strategy(model_config):
         if (len(values['true_values']) < 7):
             continue
 
-        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B)
-        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["news_sentiments"], enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS)
+        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.NEWS_MIN_HOLD_BARS, True, model_config.ENABLE_TRANSACTION_COSTS)
+        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["news_sentiments"])
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
         forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])
@@ -321,8 +321,8 @@ def run_sl_based_trading_strategy(model_config):
         if (len(values['true_values']) < 7):
             continue
 
-        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B)
-        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["news_sentiments"], use_kelly=False, enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS)
+        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.NEWS_MIN_HOLD_BARS, False, model_config.ENABLE_TRANSACTION_COSTS)
+        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["news_sentiments"])
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
         forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])
@@ -482,6 +482,7 @@ def run(args):
     model_config.WALLET_B = args.wallet_b
     model_config.USE_FRAC_KELLY = args.use_frac_kelly
     model_config.ENABLE_TRANSACTION_COSTS = args.enable_transaction_costs
+    model_config.NEWS_MIN_HOLD_BARS = args.news_min_hold_bars
 
     root_dir = os.path.dirname(os.path.abspath(__file__))
     model_config.OUTPUT_DIR = os.path.join(root_dir, args.output_dir)
@@ -508,6 +509,7 @@ def print_model_config(config):
     print(f"  Fractional Kelly Enabled  : {config.USE_FRAC_KELLY}")
     print(f"  Transaction Costs Enabled : {config.ENABLE_TRANSACTION_COSTS}")
     print(f"  Output Directory          : {config.OUTPUT_DIR}")
+    print(f"  News Min Hold Bars        : {config.NEWS_MIN_HOLD_BARS}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -530,6 +532,12 @@ if __name__ == "__main__":
     parser.add_argument("--use_frac_kelly", action="store_true", help="Use fractional Kelly to size bets. Default is False.")
     parser.add_argument("--enable_transaction_costs", action="store_true", help="Enable transaction costs. Default is False.")
     parser.add_argument("--output_dir", type=str, default="results/usd-cny-2023", help="Directory to save all outputs.")
+    parser.add_argument(
+        "--news-min-hold-bars",
+        type=int,
+        default=3,
+        help="Minimum number of bars to hold news_sentiment positions before allowing exit.",
+    )
 
     args = parser.parse_args()
     run(args)

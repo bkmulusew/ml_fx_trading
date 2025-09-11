@@ -5,7 +5,9 @@ from collections import Counter
 
 class TradingStrategy():
     """Trading Strategy for Supervised Learning based models, implementing different trading strategies using Kelly criterion for optimal bet sizing."""
-    def __init__(self, wallet_a, wallet_b):
+    def __init__(self, wallet_a, wallet_b, news_min_hold_bars, use_kelly, enable_transaction_costs):
+        self.use_kelly = use_kelly
+        self.enable_transaction_costs = enable_transaction_costs
         """Initialize the TradingStrategy class with the initial wallet balances and Kelly fraction option."""
         # Initialize wallets for different trading strategies
         self.wallet_a = {'mean_reversion': wallet_a, 'trend': wallet_a, 'pure_forcasting': wallet_a, 'hybrid_mean_reversion': wallet_a, 'hybrid_trend': wallet_a, 'news_sentiment': wallet_a, 'ensemble': wallet_a}
@@ -40,7 +42,7 @@ class TradingStrategy():
         }
 
         # Minimum hold bars for news sentiment strategy
-        self.min_hold_bars = {'news_sentiment': 3}
+        self.news_min_hold_bars = news_min_hold_bars
 
         self.min_trades_for_full_kelly = 30  # Minimum trades before using full Kelly
         self.fixed_position_size = 10000  # Fixed position size for training
@@ -106,10 +108,10 @@ class TradingStrategy():
 
         return f
 
-    def execute_trade(self, strategy_name, trade_direction, bid_price, ask_price, f_i, use_kelly, enable_transaction_costs):
+    def execute_trade(self, strategy_name, trade_direction, bid_price, ask_price, f_i):
         """Calculate profit/loss and handle position management"""
         # Determine pricing based on transaction costs setting
-        if enable_transaction_costs:
+        if self.enable_transaction_costs:
             buy_price = ask_price
             sell_price = bid_price
         else:
@@ -121,7 +123,7 @@ class TradingStrategy():
         # Check if there's an open position
         if position['type'] is not None:
             if strategy_name == 'news_sentiment':
-                min_hold_bars = self.min_hold_bars[strategy_name]
+                min_hold_bars = self.news_min_hold_bars
                 if position['bars_held'] < min_hold_bars:
                     position['bars_held'] += 1
                     return
@@ -133,7 +135,7 @@ class TradingStrategy():
             # Calculate total portfolio value in currency A
             total_value_in_a = self.wallet_a[strategy_name] + (self.wallet_b[strategy_name] / buy_price)
 
-            if(use_kelly):
+            if(self.use_kelly):
                 base_bet_size_a = f_i * total_value_in_a
             else:
                 base_bet_size_a = self.fixed_position_size
@@ -359,8 +361,7 @@ class TradingStrategy():
 
         return list(zip(X, y))
         
-    def _execute_trading_strategy(self, strategy_name, actual_rates, pred_rates, bid_prices, ask_prices, 
-                                 llm_sentiments, use_kelly, enable_transaction_costs):
+    def _execute_trading_strategy(self, strategy_name, actual_rates, pred_rates, bid_prices, ask_prices, llm_sentiments):
         """Helper method to execute trading for a specific strategy."""
         base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
         
@@ -381,10 +382,9 @@ class TradingStrategy():
             )
 
             # Execute trade
-            self.execute_trade(strategy_name, trade_direction, curr_bid_price, curr_ask_price, 
-                                         f_i, use_kelly, enable_transaction_costs)
+            self.execute_trade(strategy_name, trade_direction, curr_bid_price, curr_ask_price, f_i)
 
-    def _execute_ensemble_strategy(self, actual_rates, pred_rates, bid_prices, ask_prices, use_kelly, enable_transaction_costs, min_conf=0.0):
+    def _execute_ensemble_strategy(self, actual_rates, pred_rates, bid_prices, ask_prices, min_conf=0.0):
         """Helper method to execute ensemble trading strategy."""
         strategy_name = "ensemble"
         base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
@@ -422,10 +422,9 @@ class TradingStrategy():
 
             # Calculate Kelly fraction and execute trade
             f_i = self.kelly_criterion(strategy_name)
-            self.execute_trade(strategy_name, trade_direction, curr_bid_price, curr_ask_price, 
-                                         f_i, use_kelly, enable_transaction_costs)
+            self.execute_trade(strategy_name, trade_direction, curr_bid_price, curr_ask_price, f_i)
         
-    def _close_all_remaining_positions(self, strategy_names, bid_prices, ask_prices, enable_transaction_costs):
+    def _close_all_remaining_positions(self, strategy_names, bid_prices, ask_prices):
         """Helper method to close any remaining open positions for all strategies."""
         for strategy_name in strategy_names:
             position = self.open_positions[strategy_name]
@@ -433,13 +432,13 @@ class TradingStrategy():
                 sell_price = bid_prices[-1]
                 buy_price = ask_prices[-1]
                 
-                if not enable_transaction_costs:
+                if not self.enable_transaction_costs:
                     mid_price = (sell_price + buy_price) / 2
                     buy_price = sell_price = mid_price
                     
                 self.close_position(strategy_name, sell_price, buy_price)
 
-    def simulate_trading_with_strategies(self, actual_rates, pred_rates, bid_prices, ask_prices, llm_sentiments, use_kelly=True, enable_transaction_costs=False):
+    def simulate_trading_with_strategies(self, actual_rates, pred_rates, bid_prices, ask_prices, llm_sentiments):
         """Simulate trading over a series of exchange rates using different strategies."""
 
         strategy_name = "ensemble"
@@ -465,18 +464,17 @@ class TradingStrategy():
 
         # Phase 3: Execute trading strategies
         print("Executing ensemble strategy...")
-        self._execute_ensemble_strategy(actual_rates_test, pred_rates_test, bid_prices_test, 
-                                       ask_prices_test, use_kelly, enable_transaction_costs)
+        self._execute_ensemble_strategy(actual_rates_test, pred_rates_test, bid_prices_test, ask_prices_test)
         
         print("Executing base strategies...")
         base_strategy_names = ['mean_reversion', 'trend', 'pure_forcasting', 'hybrid_mean_reversion', 'hybrid_trend', 'news_sentiment']
         for strategy_name in base_strategy_names:
             self._execute_trading_strategy(strategy_name, actual_rates_test, pred_rates_test, 
-                                         bid_prices_test, ask_prices_test, llm_sentiments_test, use_kelly, enable_transaction_costs)
+                                         bid_prices_test, ask_prices_test, llm_sentiments_test)
             
          # Phase 4: Close remaining positions and calculate results
         all_strategy_names = base_strategy_names + ['ensemble']
-        self._close_all_remaining_positions(all_strategy_names, bid_prices_test, ask_prices_test, enable_transaction_costs)
+        self._close_all_remaining_positions(all_strategy_names, bid_prices_test, ask_prices_test)
 
         # Calculate Sharpe ratios for selected strategies
         selected_strategies = ['mean_reversion', 'trend', 'pure_forcasting', 'news_sentiment', 'ensemble']
