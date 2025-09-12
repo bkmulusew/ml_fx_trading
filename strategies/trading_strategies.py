@@ -188,6 +188,9 @@ class TradingStrategy():
 
             # Calculate profit in currency B terms
             profit_in_curr_b = exit_amount_b - position['size_b']  # What we got vs what we paid
+
+            # Convert realized B-PnL to A at the close (sell) rate
+            profit_in_curr_a = profit_in_curr_b / sell_price
     
             # Update wallets
             self.wallet_a[strategy_name] -= position['size_a']
@@ -199,6 +202,9 @@ class TradingStrategy():
             
             # Calculate profit in currency B terms
             profit_in_curr_b = position['size_b'] - cost_to_buyback_a
+
+            # Convert realized B-PnL to A at the close (buy) rate
+            profit_in_curr_a = profit_in_curr_b / buy_price
             
             # Update wallets
             self.wallet_b[strategy_name] -= cost_to_buyback_a
@@ -209,15 +215,15 @@ class TradingStrategy():
 
         # Update profit tracking
         self.num_trades[strategy_name] += 1
-        self.total_profit_or_loss[strategy_name] += profit_in_curr_b
-        self.trade_returns[strategy_name].append(profit_in_curr_b)
+        self.total_profit_or_loss[strategy_name] += profit_in_curr_a
+        self.trade_returns[strategy_name].append(profit_in_curr_a)
 
-        if profit_in_curr_b > 0:
+        if profit_in_curr_a > 0:
             self.num_wins[strategy_name] += 1
-            self.total_gains[strategy_name] += profit_in_curr_b
-        elif profit_in_curr_b < 0:
+            self.total_gains[strategy_name] += profit_in_curr_a
+        elif profit_in_curr_a < 0:
             self.num_losses[strategy_name] += 1
-            self.total_losses[strategy_name] += abs(profit_in_curr_b)
+            self.total_losses[strategy_name] += abs(profit_in_curr_a)
     
     def determine_trade_direction(self, strategy_name, base_pct_change, pred_pct_change, llm_sentiment):
         """Determine the trade direction based on strategy and ratio changes."""
