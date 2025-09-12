@@ -154,8 +154,8 @@ def run_sl_based_trading_strategy(model_config):
         if (len(values['true_values']) < 7):
             continue
 
-        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B)
-        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["news_sentiments"], enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS, hold_position=model_config.HOLD_POSITION)
+        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.NEWS_MIN_HOLD_BARS, True, model_config.ENABLE_TRANSACTION_COSTS)
+        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["news_sentiments"])
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
         forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])
@@ -201,6 +201,8 @@ def run_sl_based_trading_strategy(model_config):
     cumulative_hybrid_trend_profit = np.cumsum(hybrid_trend_profit)
     cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
     cumulative_ensemble_profit = np.cumsum(ensemble_profit)
+
+    print(f"Cummulative News Sentiment Profit: {cumulative_news_sentiment_profit[-1]}")
 
     cumulative_mean_reversion_profit_per_trade = [
         np.sum(mean_reversion_profit[:i+1]) / np.sum(mean_reversion_num_trades[:i+1]) for i in range(len(mean_reversion_profit))
@@ -342,8 +344,8 @@ def run_sl_based_trading_strategy(model_config):
         if (len(values['true_values']) < 7):
             continue
 
-        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B)
-        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["news_sentiments"], use_kelly=False, enable_transaction_costs=model_config.ENABLE_TRANSACTION_COSTS, hold_position=model_config.HOLD_POSITION)
+        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.NEWS_MIN_HOLD_BARS, False, model_config.ENABLE_TRANSACTION_COSTS)
+        trading_strategy.simulate_trading_with_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["news_sentiments"])
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
         forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])
@@ -389,6 +391,8 @@ def run_sl_based_trading_strategy(model_config):
     cumulative_hybrid_trend_profit = np.cumsum(hybrid_trend_profit)
     cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
     cumulative_ensemble_profit = np.cumsum(ensemble_profit)
+
+    print(f"Cummulative News Sentiment Profit: {cumulative_news_sentiment_profit[-1]}")
 
     cumulative_mean_reversion_profit_per_trade = [
         np.sum(mean_reversion_profit[:i+1]) / np.sum(mean_reversion_num_trades[:i+1]) for i in range(len(mean_reversion_profit))
@@ -499,9 +503,10 @@ def run(args):
     model_config.DATA_PATH_TEST = args.data_path_test
     model_config.WALLET_A = args.wallet_a
     model_config.WALLET_B = args.wallet_b
-    model_config.HOLD_POSITION = args.hold_position
     model_config.USE_FRAC_KELLY = args.use_frac_kelly
     model_config.ENABLE_TRANSACTION_COSTS = args.enable_transaction_costs
+    model_config.NEWS_MIN_HOLD_BARS = args.news_min_hold_bars
+    model_config.SENTIMENT_SOURCE = args.sentiment_source
 
     root_dir = os.path.dirname(os.path.abspath(__file__))
     model_config.OUTPUT_DIR = os.path.join(root_dir, args.output_dir)
@@ -525,10 +530,11 @@ def print_model_config(config):
     print(f"  Data Path Test            : {config.DATA_PATH_TEST}")
     print(f"  Wallet A Initial Amount   : {config.WALLET_A}")
     print(f"  Wallet B Initial Amount   : {config.WALLET_B}")
-    print(f"  Hold Position Enabled     : {config.HOLD_POSITION}")
     print(f"  Fractional Kelly Enabled  : {config.USE_FRAC_KELLY}")
     print(f"  Transaction Costs Enabled : {config.ENABLE_TRANSACTION_COSTS}")
     print(f"  Output Directory          : {config.OUTPUT_DIR}")
+    print(f"  News Min Hold Bars        : {config.NEWS_MIN_HOLD_BARS}")
+    print(f"  Sentiment Source          : {config.SENTIMENT_SOURCE}")
 
 if __name__ == "__main__":
     set_seed(25)
@@ -538,9 +544,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model_name",
         type=str,
+        choices=[
+            "nbeats",
+            "nhits",
+            "tcn",
+            "toto"
+        ],
         default="tcn",
-        help="Specify the model to use. Supported models include 'nbeats' for NBEATS, 'nhits' for NHiTS, 'tcn' for Temporal Convolutional Network, and 'toto' for Toto. \
-            Default is 'tcn'."
+        help="Specify the model to use. Default is 'tcn'."
     )
     parser.add_argument("--input_chunk_length", type=int, default=64, help="Length of the input sequences.")
     parser.add_argument("--output_chunk_length", type=int, default=1, help="Length of the output sequences.")
@@ -551,8 +562,25 @@ if __name__ == "__main__":
     parser.add_argument("--data_path_test", type=str, default="", help="Path to the test data. Currency rates should be provided as 1 A / 1 B, where A and B are the respective currencies.", required=True)
     parser.add_argument("--use_frac_kelly", action="store_true", help="Use fractional Kelly to size bets. Default is False.")
     parser.add_argument("--enable_transaction_costs", action="store_true", help="Enable transaction costs. Default is False.")
-    parser.add_argument("--hold_position", action="store_true", help="Enable holding position. Default is False.")
     parser.add_argument("--output_dir", type=str, default="results/usd-cny-2023", help="Directory to save all outputs.")
+    parser.add_argument(
+        "--news-min-hold-bars",
+        type=int,
+        default=3,
+        help="Minimum number of bars to hold news_sentiment positions before allowing exit.",
+    )
+    parser.add_argument(
+        "--sentiment_source",
+        type=str,
+        choices=[
+            "expert_llm_prompt_label",
+            "naive_prompt_label",
+            "competitor_label",
+            "naive_plus_prompt_converted_label"
+        ],
+        default="competitor_label",
+        help="Choose which sentiment label column to use for trading."
+    )
 
     args = parser.parse_args()
     

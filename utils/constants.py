@@ -14,5 +14,6 @@ class ModelConfig:
     WALLET_B: float = 10000.0
     USE_FRAC_KELLY: bool = True
     ENABLE_TRANSACTION_COSTS: bool = False
-    HOLD_POSITION: bool = False
     OUTPUT_DIR: str = "results/usd-cny-2023"
+    NEWS_MIN_HOLD_BARS: int = 3
+    SENTIMENT_SOURCE: str = "competitor_label"
