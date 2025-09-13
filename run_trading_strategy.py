@@ -1,6 +1,9 @@
+# importing to set up reproducibility 
+import os
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 from utils import ModelConfig
 from data_processing import DataProcessor
-from models import DartsFinancialForecastingModel, TotoFinancialForecastingModel
+from models import DartsFinancialForecastingModel, ChronosFinancialForecastingModel, TotoFinancialForecastingModel
 from metrics import ModelEvaluationMetrics
 from matplotlib import pyplot as plt
 import numpy as np
@@ -10,6 +13,21 @@ from strategies import TradingStrategy
 from collections import defaultdict
 from datetime import datetime
 import matplotlib.pyplot as plt
+
+
+import torch
+import random
+import numpy as np
+def set_seed(seed):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        torch.use_deterministic_algorithms(True)
+
 
 def plot_prediction_comparison(true_values, predicted_values, model_config):
     """Plot true vs predicted values and save the figure."""
@@ -63,6 +81,11 @@ def run_sl_based_trading_strategy(model_config):
         test_series, test_dates, test_bid_prices, test_ask_prices, test_news_sentiments = predictor.split_and_scale_data()
         predicted_values = predictor.generate_predictions(test_series)
         true_values = predictor.test_mid_prices
+    elif model_config.MODEL_NAME == 'chronos':
+        predictor = ChronosFinancialForecastingModel(dataProcessor, model_config)
+        test_series, test_dates, test_bid_prices, test_ask_prices, test_news_sentiments = predictor.split_and_scale_data()
+        predicted_values = predictor.generate_predictions(test_series)
+        true_values = predictor.test_mid_prices
     else:
         predictor = DartsFinancialForecastingModel(dataProcessor, model_config)
         train_series, valid_series, test_series, test_dates, test_bid_prices, test_ask_prices, test_news_sentiments = predictor.split_and_scale_data()
@@ -82,10 +105,10 @@ def run_sl_based_trading_strategy(model_config):
 
     # Group data by date for trading simulation
     chunked_values = group_data_by_date(
-        parsed_test_dates, 
-        true_values, 
+        parsed_test_dates,
+        true_values,
         predicted_values,
-        test_bid_prices, 
+        test_bid_prices,
         test_ask_prices,
         test_news_sentiments
     )
@@ -514,6 +537,7 @@ def print_model_config(config):
     print(f"  Sentiment Source          : {config.SENTIMENT_SOURCE}")
 
 if __name__ == "__main__":
+    set_seed(25)
     parser = argparse.ArgumentParser()
     parser.add_argument("--wallet_a", type=float, default=1000000.0, help="Amount of money in wallet A (currency A).")
     parser.add_argument("--wallet_b", type=float, default=1000000.0, help="Amount of money in wallet B (currency B).")
@@ -524,7 +548,8 @@ if __name__ == "__main__":
             "nbeats",
             "nhits",
             "tcn",
-            "toto"
+            "toto",
+            "chronos"
         ],
         default="tcn",
         help="Specify the model to use. Default is 'tcn'."
@@ -559,4 +584,5 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+    
     run(args)
