@@ -548,7 +548,8 @@ if __name__ == "__main__":
             "nbeats",
             "nhits",
             "tcn",
-            "toto"
+            "toto",
+            "chronos"
         ],
         default="tcn",
         help="Specify the model to use. Default is 'tcn'."
