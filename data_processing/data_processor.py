@@ -22,7 +22,7 @@ class DataProcessor:
         ask_prices = data_df_test["ask_price"].tolist()
         news_sentiments = data_df_test[self.model_config.SENTIMENT_SOURCE].tolist()
         
-        if self.model_config.MODEL_NAME == 'toto':
+        if self.model_config.MODEL_NAME == 'toto' or self.model_config.MODEL_NAME == 'chronos':
             mid_price_series_train = data_df_train["mid_price"].values
             mid_price_series_val = data_df_val["mid_price"].values
             mid_price_series_test = data_df_test["mid_price"].values

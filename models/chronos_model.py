@@ -2,52 +2,33 @@ from models import FinancialForecastingModel
 import numpy as np
 import torch
 from sklearn.preprocessing import MinMaxScaler
-from models.toto.toto.data.util.dataset import MaskedTimeseries
-from models.toto.toto.inference.forecaster import TotoForecaster
-from models.toto.toto.model.toto import Toto
+from chronos import ChronosBoltPipeline
 
-NUM_SAMPLES: int = 128
-TIME_INTERVAL_SECONDS: float = 60.0
-
-class TotoFinancialForecastingModel(FinancialForecastingModel):
-    """Financial forecasting model using Toto's pre-trained transformer for zero-shot forecasting"""
+class ChronosFinancialForecastingModel(FinancialForecastingModel):
+    """Financial forecasting model using Amazon's Chronos-bolt, a pre-trained transformer for zero-shot forecasting"""
 
     def __init__(self, data_processor, model_config):
         self.data_processor = data_processor
         self.model_config = model_config
         self.scaler = MinMaxScaler(feature_range=(0, 1))
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.MODEL_NAME = "autogluon/chronos-bolt-base"
+        self.PRESET_NAME = "bolt_base"
+        print(f"Initializing Chronos-Bolt with context length {self.model_config.INPUT_CHUNK_LENGTH},\n"
+              f"batch size {self.model_config.BATCH_SIZE} and prediction length {self.model_config.OUTPUT_CHUNK_LENGTH}")
         self.forecaster = self.initialize_model()
 
+
     def initialize_model(self):
-        """Load pre-trained Toto model and compile it"""
-        print("Loading Toto model...")
-
+        """Load pre-trained predictor"""
         try:
-            toto = Toto.from_pretrained('Datadog/Toto-Open-Base-1.0')
-            toto.to(self.device)
-
-            # Compile for better performance (optional)
-            try:
-                toto.compile()
-                print("Model compiled successfully")
-            except Exception as e:
-                print(f"Warning: Could not compile model: {e}")
-            
-            # Initialize forecaster with the underlying model
-            forecaster = TotoForecaster(toto.model)
-
-            print("Toto model loaded successfully!")
-
-            return forecaster
-
+            pipeline = ChronosBoltPipeline.from_pretrained(self.MODEL_NAME)
+            return pipeline
         except Exception as e:
-            print(f"Error loading Toto model: {e}")
-            raise
+            print(f"Error initializing Chronos model: {e}")
 
-    def split_and_scale_data(self):
+    def split_and_scale_data(self, train_ratio=0.5, validation_ratio=0.1):
         """Prepare data with proper train/test split and no data leakage"""
-        # Extract raw data
         data = self.data_processor.prepare_fx_data()
 
         dates = data["dates"]
@@ -81,61 +62,36 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
         )
 
         return (X_test_scaled, *meta)
-    
+
     def _align_test_targets(self, **test_series):
         """Process all test data series by applying the input chunk length offset."""
         return [
             series[self.model_config.INPUT_CHUNK_LENGTH:]
             for series in test_series.values()
-        ]
+        ]    
 
     def train(self):
         """No training needed for zero-shot forecasting"""
-        print("Toto model used in zero-shot mode - skipping training")
+        print("Model used in zero-shot mode - skipping training")
+        return None
 
     def predict_future_values(self, input_sequences):
         """Make prediction for a batch of input sequences"""
 
-        # input_sequences shape: (BATCH_SIZE, INPUT_CHUNK_LENGTH, 1)
-        batch_size, _, num_features = input_sequences.shape
+        # Convert to tensor (BATCH_SIZE, INPUT_CHUNK_LENGTH)
+        batch_array = np.array(input_sequences, dtype=np.float32).squeeze(axis=-1)
+        inputs = torch.FloatTensor(batch_array).to(self.device)
 
-        # Toto expects (batch, variates, time_steps)
-        # Transpose from (batch, time_steps, features) to (batch, features, time_steps)
-        batch_tensor = torch.FloatTensor(input_sequences).transpose(1, 2).to(self.device)
+        try:
+            with torch.no_grad():
+                quantiles, mean = self.forecaster.predict_quantiles(inputs, prediction_length=self.model_config.OUTPUT_CHUNK_LENGTH)
+                
+            predictions = mean.cpu().numpy()
+            return predictions
 
-        # Create timestamp and time interval tensors
-        timestamp_seconds = torch.zeros_like(batch_tensor).to(self.device)
-        time_interval_seconds = torch.full(
-            (batch_size, num_features),  # Only one feature now
-            TIME_INTERVAL_SECONDS, 
-            dtype=torch.float32
-        ).to(self.device)
-
-        # Create MaskedTimeseries with univariate input
-        inputs = MaskedTimeseries(
-            series=batch_tensor,
-            padding_mask=torch.full_like(batch_tensor, True, dtype=torch.bool),
-            id_mask=torch.zeros_like(batch_tensor, dtype=torch.long),
-            timestamp_seconds=timestamp_seconds,
-            time_interval_seconds=time_interval_seconds,
-        )
-
-        with torch.no_grad():
-            forecast = self.forecaster.forecast(
-                inputs,
-                prediction_length=self.model_config.OUTPUT_CHUNK_LENGTH,
-                num_samples=NUM_SAMPLES,
-                samples_per_batch=NUM_SAMPLES,
-            )
-
-        # Extract predictions using median for robustness
-        # forecast.median shape: (batch, variates, prediction_length)
-        predictions = forecast.median.cpu().numpy()
-        
-        # Extract mid price predictions (only variate now)
-        mid_predictions = predictions[:, 0, 0]  # Shape: (batch_size,)
-    
-        return mid_predictions
+        except Exception as e:
+            print(f"Error in batch prediction: {e}")
+            return [seq[-1] for seq in input_sequences]
 
     def generate_predictions(self, data):
         """Generate predictions using sliding window with batching"""
@@ -162,7 +118,7 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
             batch_input = data[indices]  # Shape: (actual_batch_size, INPUT_CHUNK_LENGTH, 1)
             
             predictions = self.predict_future_values(batch_input)
-            all_predictions[batch_start:batch_end] = predictions
+            all_predictions[batch_start:batch_end] = predictions[:, 0]
 
         # Inverse transform
         predictions_reshaped = all_predictions.reshape(-1, 1)
