@@ -12,7 +12,6 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
         self.model_config = model_config
         self.scaler = MinMaxScaler(feature_range=(0, 1))
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model_config = model_config
         self.MODEL_NAME = "autogluon/chronos-bolt-base"
         self.PRESET_NAME = "bolt_base"
         print(f"Initializing Chronos-Bolt with context length {self.model_config.INPUT_CHUNK_LENGTH},\n"
@@ -63,15 +62,13 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
         )
 
         return (X_test_scaled, *meta)
-    
+
     def _align_test_targets(self, **test_series):
         """Process all test data series by applying the input chunk length offset."""
         return [
             series[self.model_config.INPUT_CHUNK_LENGTH:]
             for series in test_series.values()
         ]    
-    
- 
 
     def train(self):
         """No training needed for zero-shot forecasting"""
@@ -97,7 +94,6 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
         except Exception as e:
             print(f"Error in batch prediction: {e}")
             return [seq[-1] for seq in input_sequences]
-
 
     def generate_predictions(self, data):
         """Generate predictions using sliding window with batching"""
