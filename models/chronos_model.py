@@ -85,9 +85,7 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
         try:
             with torch.no_grad():
                 quantiles, mean = self.forecaster.predict_quantiles(inputs, prediction_length=self.model_config.OUTPUT_CHUNK_LENGTH)
-                # median_percentile = quantiles[:, :, 4]
                 
-            # predictions = median_percentile.cpu().numpy().flatten()
             predictions = mean.cpu().numpy()
             return predictions
 
