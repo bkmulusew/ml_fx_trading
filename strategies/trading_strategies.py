@@ -10,16 +10,17 @@ class TradingStrategy():
         self.enable_transaction_costs = enable_transaction_costs
         """Initialize the TradingStrategy class with the initial wallet balances and Kelly fraction option."""
         # Initialize wallets for different trading strategies
-        self.wallet_a = {'mean_reversion': wallet_a, 'trend': wallet_a, 'pure_forcasting': wallet_a, 'hybrid_mean_reversion': wallet_a, 'hybrid_trend': wallet_a, 'news_sentiment': wallet_a, 'ensemble': wallet_a}
-        self.wallet_b = {'mean_reversion': wallet_b, 'trend': wallet_b, 'pure_forcasting': wallet_b, 'hybrid_mean_reversion': wallet_b, 'hybrid_trend': wallet_b, 'news_sentiment': wallet_b, 'ensemble': wallet_b}
+        self.wallet_a = {'random': wallet_a, 'mean_reversion': wallet_a, 'trend': wallet_a, 'pure_forcasting': wallet_a, 'hybrid_mean_reversion': wallet_a, 'hybrid_trend': wallet_a, 'news_sentiment': wallet_a, 'ensemble': wallet_a}
+        self.wallet_b = {'random': wallet_b, 'mean_reversion': wallet_b, 'trend': wallet_b, 'pure_forcasting': wallet_b, 'hybrid_mean_reversion': wallet_b, 'hybrid_trend': wallet_b, 'news_sentiment': wallet_b, 'ensemble': wallet_b}
         # Track profit/loss, wins/losses, and total gains/losses for each strategy
-        self.total_profit_or_loss = {'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.num_trades = {'mean_reversion': 1, 'trend': 1, 'pure_forcasting': 1, 'hybrid_mean_reversion': 1, 'hybrid_trend': 1, 'news_sentiment': 1, 'ensemble': 1}
-        self.num_wins = {'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.num_losses = {'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.total_gains = {'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.total_losses = {'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0, 'news_sentiment': 0, 'ensemble': 0}
+        self.total_profit_or_loss = {'random': 0, 'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0, 'news_sentiment': 0, 'ensemble': 0}
+        self.num_trades = {'random': 1, 'mean_reversion': 1, 'trend': 1, 'pure_forcasting': 1, 'hybrid_mean_reversion': 1, 'hybrid_trend': 1, 'news_sentiment': 1, 'ensemble': 1}
+        self.num_wins = {'random': 0, 'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0, 'news_sentiment': 0, 'ensemble': 0}
+        self.num_losses = {'random': 0, 'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0, 'news_sentiment': 0, 'ensemble': 0}
+        self.total_gains = {'random': 0, 'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0, 'news_sentiment': 0, 'ensemble': 0}
+        self.total_losses = {'random': 0, 'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0, 'news_sentiment': 0, 'ensemble': 0}
         self.trade_returns = {
+            'random': [],
             'mean_reversion': [],
             'trend': [],
             'pure_forcasting': [],
@@ -28,10 +29,11 @@ class TradingStrategy():
             'news_sentiment': [],
             'ensemble': []
         }
-        self.sharpe_ratios = {'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0, 'news_sentiment': 0, 'ensemble': 0}
+        self.sharpe_ratios = {'random': 0, 'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0, 'news_sentiment': 0, 'ensemble': 0}
 
         # New: Track open positions
         self.open_positions = {
+            'random': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0},
             'mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0},
             'trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0},
             'pure_forcasting': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0},
@@ -229,7 +231,10 @@ class TradingStrategy():
         """Determine the trade direction based on strategy and ratio changes."""
         trade_direction = 'no_trade'
 
-        if(strategy_name == "mean_reversion"):
+        if(strategy_name == "random"):
+            trade_direction = 'buy_currency_a' if np.random.random() < 0.5 else 'sell_currency_a'
+
+        elif(strategy_name == "mean_reversion"):
             if base_pct_change < 0:
                 trade_direction = 'buy_currency_a'
             elif base_pct_change > 0:
@@ -414,6 +419,7 @@ class TradingStrategy():
                 pred_trade_direction = int(classes[pred_best_idx])
 
             # Convert to trade direction
+            # TODO: Check if this is correct
             if pred_best_prob < min_conf:
                 trade_direction = 'no_trade'
             elif pred_trade_direction == self.label_mapping["buy_currency_a"]:
@@ -430,25 +436,21 @@ class TradingStrategy():
             f_i = self.kelly_criterion(strategy_name)
             self.execute_trade(strategy_name, trade_direction, curr_bid_price, curr_ask_price, f_i)
         
-    def _close_all_remaining_positions(self, strategy_names, bid_prices, ask_prices):
-        """Helper method to close any remaining open positions for all strategies."""
-        for strategy_name in strategy_names:
-            position = self.open_positions[strategy_name]
-            if position['type'] is not None:
-                sell_price = bid_prices[-1]
-                buy_price = ask_prices[-1]
+    def _close_remaining_positions(self, strategy_name, bid_prices, ask_prices):
+        """Helper method to close any remaining open positions for a specific strategy."""
+        position = self.open_positions[strategy_name]
+        if position['type'] is not None:
+            sell_price = bid_prices[-1]
+            buy_price = ask_prices[-1]
+            
+            if not self.enable_transaction_costs:
+                mid_price = (sell_price + buy_price) / 2
+                buy_price = sell_price = mid_price
                 
-                if not self.enable_transaction_costs:
-                    mid_price = (sell_price + buy_price) / 2
-                    buy_price = sell_price = mid_price
-                    
-                self.close_position(strategy_name, sell_price, buy_price)
+            self.close_position(strategy_name, sell_price, buy_price)
 
     def simulate_trading_with_strategies(self, actual_rates, pred_rates, bid_prices, ask_prices, llm_sentiments):
         """Simulate trading over a series of exchange rates using different strategies."""
-
-        strategy_name = "ensemble"
-        
         # Phase 1: Data preparation and splitting
         split_idx = len(actual_rates) // 2
         
@@ -480,15 +482,45 @@ class TradingStrategy():
             
          # Phase 4: Close remaining positions and calculate results
         all_strategy_names = base_strategy_names + ['ensemble']
-        self._close_all_remaining_positions(all_strategy_names, bid_prices_test, ask_prices_test)
+        for strategy_name in all_strategy_names:
+            self._close_remaining_positions(strategy_name, bid_prices_test, ask_prices_test)
 
-        # Calculate Sharpe ratios for selected strategies
-        selected_strategies = ['mean_reversion', 'trend', 'pure_forcasting', 'news_sentiment', 'ensemble']
-        for strategy_name in selected_strategies:
+        # Calculate Sharpe ratios for all strategies
+        for strategy_name in all_strategy_names:
             self.sharpe_ratios[strategy_name] = TradingUtils.calculate_sharpe_ratio(self.trade_returns[strategy_name])
 
         # Display results
-        print("=== Trading Simulation Results ===")
-        self.display_total_profit()
-        self.diplay_num_trades()
-        print("\n")
+        # print("=== Trading Simulation Results ===")
+        # self.display_total_profit()
+        # self.diplay_num_trades()
+        # print("\n")
+
+    def simulate_trading_with_random_strategies(self, actual_rates, pred_rates, bid_prices, ask_prices, llm_sentiments):
+        """Simulate trading over a series of exchange rates using different strategies."""
+        # Phase 1: Data preparation and splitting
+        split_idx = len(actual_rates) // 2
+        
+        actual_rates_train = actual_rates[:split_idx]
+        pred_rates_train = pred_rates[:split_idx]
+        llm_sentiments_train = llm_sentiments[:split_idx]
+        
+        actual_rates_test = actual_rates[split_idx:]
+        pred_rates_test = pred_rates[split_idx:]
+        bid_prices_test = bid_prices[split_idx:]
+        ask_prices_test = ask_prices[split_idx:]
+        llm_sentiments_test = llm_sentiments[split_idx:]
+        
+        print("Executing base strategies...")
+        base_strategy_names = ['random']
+        for strategy_name in base_strategy_names:
+            self._execute_trading_strategy(strategy_name, actual_rates_test, pred_rates_test, 
+                                         bid_prices_test, ask_prices_test, llm_sentiments_test)
+            
+         # Phase 4: Close remaining positions and calculate results
+        all_strategy_names = base_strategy_names
+        for strategy_name in all_strategy_names:
+            self._close_remaining_positions(strategy_name, bid_prices_test, ask_prices_test)
+
+        # Calculate Sharpe ratios for all strategies
+        for strategy_name in all_strategy_names:
+            self.sharpe_ratios[strategy_name] = TradingUtils.calculate_sharpe_ratio(self.trade_returns[strategy_name])

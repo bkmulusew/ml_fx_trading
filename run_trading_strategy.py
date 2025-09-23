@@ -4,12 +4,15 @@ from models import DartsFinancialForecastingModel, TotoFinancialForecastingModel
 from metrics import ModelEvaluationMetrics
 from matplotlib import pyplot as plt
 import numpy as np
+import pandas as pd
 import argparse
 import os
 from strategies import TradingStrategy
 from collections import defaultdict
 from datetime import datetime
 import matplotlib.pyplot as plt
+
+NUM_SIMULATIONS = 1000
 
 def plot_prediction_comparison(true_values, predicted_values, model_config):
     """Plot true vs predicted values and save the figure."""
@@ -170,6 +173,19 @@ def run_sl_based_trading_strategy(model_config):
         hybrid_trend_sharpe_ratios.append(trading_strategy.sharpe_ratios["hybrid_trend"])
         news_sentiment_sharpe_ratios.append(trading_strategy.sharpe_ratios["news_sentiment"])
         ensemble_sharpe_ratios.append(trading_strategy.sharpe_ratios["ensemble"])
+
+    random_cumulative_profits = []
+
+    for _ in range(NUM_SIMULATIONS):
+        random_profit = []
+        for _, values in chunked_values.items():
+            if (len(values['true_values']) < 7):
+                continue
+
+            trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.NEWS_MIN_HOLD_BARS, True, model_config.ENABLE_TRANSACTION_COSTS)
+            trading_strategy.simulate_trading_with_random_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["news_sentiments"])
+            random_profit.append(trading_strategy.total_profit_or_loss["random"])
+        random_cumulative_profits.append(np.sum(random_profit))
             
     cumulative_mean_reversion_profit = np.cumsum(mean_reversion_profit)
     cumulative_trend_profit = np.cumsum(trend_profit)
@@ -179,7 +195,77 @@ def run_sl_based_trading_strategy(model_config):
     cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
     cumulative_ensemble_profit = np.cumsum(ensemble_profit)
 
-    print(f"Cummulative News Sentiment Profit: {cumulative_news_sentiment_profit[-1]}")
+    null = np.asarray(random_cumulative_profits, dtype=float)   # shape: (N,)
+
+    if null.ndim != 1 or null.size == 0:
+        raise ValueError("random_cumulative_profits must be a non-empty 1-D array/list.")
+
+    # 2) Observed final cumulative profits (you already computed these)
+    finals = {
+        "mean_reversion": cumulative_mean_reversion_profit[-1],
+        "trend": cumulative_trend_profit[-1],
+        "forecasting": cumulative_forecasting_profit[-1],
+        "hybrid_mean_reversion": cumulative_hybrid_mean_reversion_profit[-1],
+        "hybrid_trend": cumulative_hybrid_trend_profit[-1],
+        "news_sentiment": cumulative_news_sentiment_profit[-1],
+        "ensemble": cumulative_ensemble_profit[-1],
+    }
+
+    # 3) Monte-Carlo p-value helpers (+1 / (N+1) correction prevents p=0)
+    def p_one_sided(obs, null):
+        # H1: profit is unusually large (right-tail test)
+        return (np.sum(null >= obs) + 1) / (len(null) + 1)
+
+    def p_two_sided(obs, null):
+        # Center at median in case null is skewed by costs/slippage
+        med = np.median(null)
+        return (np.sum(np.abs(null - med) >= abs(obs - med)) + 1) / (len(null) + 1)
+
+    # 4) Useful summary stats (null band, percentile)
+    lo95, hi95 = np.percentile(null, [2.5, 97.5])
+    null_mean = float(np.mean(null))
+    null_std = float(np.std(null, ddof=1))
+
+    rows = []
+    for name, obs in finals.items():
+        # guard against None or NaN
+        if obs is None or (isinstance(obs, float) and np.isnan(obs)):
+            rows.append({
+                "strategy": name,
+                "obs_profit": obs,
+                "p_one_sided": np.nan,
+                "p_two_sided": np.nan,
+                "percentile_in_null": np.nan,
+                "null_mean": null_mean,
+                "null_std": null_std,
+                "null_2.5%": lo95,
+                "null_97.5%": hi95,
+                "above_95%_band": False,
+                "below_95%_band": False,
+            })
+            continue
+
+        p1 = p_one_sided(obs, null)
+        p2 = p_two_sided(obs, null)
+        pct = 100.0 * np.mean(null <= obs)
+        rows.append({
+            "strategy": name,
+            "obs_profit": float(obs),
+            "p_one_sided": float(p1),
+            "p_two_sided": float(p2),
+            "percentile_in_null": float(pct),
+            "null_mean": null_mean,
+            "null_std": null_std,
+            "null_2.5%": lo95,
+            "null_97.5%": hi95,
+            "above_95%_band": bool(obs > hi95),
+            "below_95%_band": bool(obs < lo95),
+        })
+
+    summary = pd.DataFrame(rows).sort_values("p_one_sided")
+    print(summary.to_string(index=False, float_format=lambda x: f"{x:,.6f}"))
+
+    # print(f"Cummulative News Sentiment Profit: {cumulative_news_sentiment_profit[-1]}")
 
     cumulative_mean_reversion_profit_per_trade = [
         np.sum(mean_reversion_profit[:i+1]) / np.sum(mean_reversion_num_trades[:i+1]) for i in range(len(mean_reversion_profit))
@@ -360,6 +446,19 @@ def run_sl_based_trading_strategy(model_config):
         hybrid_trend_sharpe_ratios.append(trading_strategy.sharpe_ratios["hybrid_trend"])
         news_sentiment_sharpe_ratios.append(trading_strategy.sharpe_ratios["news_sentiment"])
         ensemble_sharpe_ratios.append(trading_strategy.sharpe_ratios["ensemble"])
+
+    random_cumulative_profits = []
+
+    for _ in range(NUM_SIMULATIONS):
+        random_profit = []
+        for _, values in chunked_values.items():
+            if (len(values['true_values']) < 7):
+                continue
+
+            trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.NEWS_MIN_HOLD_BARS, False, model_config.ENABLE_TRANSACTION_COSTS)
+            trading_strategy.simulate_trading_with_random_strategies(values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["news_sentiments"])
+            random_profit.append(trading_strategy.total_profit_or_loss["random"])
+        random_cumulative_profits.append(np.sum(random_profit))
             
     cumulative_mean_reversion_profit = np.cumsum(mean_reversion_profit)
     cumulative_trend_profit = np.cumsum(trend_profit)
@@ -369,7 +468,77 @@ def run_sl_based_trading_strategy(model_config):
     cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
     cumulative_ensemble_profit = np.cumsum(ensemble_profit)
 
-    print(f"Cummulative News Sentiment Profit: {cumulative_news_sentiment_profit[-1]}")
+    null = np.asarray(random_cumulative_profits, dtype=float)   # shape: (N,)
+
+    if null.ndim != 1 or null.size == 0:
+        raise ValueError("random_cumulative_profits must be a non-empty 1-D array/list.")
+
+    # 2) Observed final cumulative profits (you already computed these)
+    finals = {
+        "mean_reversion": cumulative_mean_reversion_profit[-1],
+        "trend": cumulative_trend_profit[-1],
+        "forecasting": cumulative_forecasting_profit[-1],
+        "hybrid_mean_reversion": cumulative_hybrid_mean_reversion_profit[-1],
+        "hybrid_trend": cumulative_hybrid_trend_profit[-1],
+        "news_sentiment": cumulative_news_sentiment_profit[-1],
+        "ensemble": cumulative_ensemble_profit[-1],
+    }
+
+    # 3) Monte-Carlo p-value helpers (+1 / (N+1) correction prevents p=0)
+    def p_one_sided(obs, null):
+        # H1: profit is unusually large (right-tail test)
+        return (np.sum(null >= obs) + 1) / (len(null) + 1)
+
+    def p_two_sided(obs, null):
+        # Center at median in case null is skewed by costs/slippage
+        med = np.median(null)
+        return (np.sum(np.abs(null - med) >= abs(obs - med)) + 1) / (len(null) + 1)
+
+    # 4) Useful summary stats (null band, percentile)
+    lo95, hi95 = np.percentile(null, [2.5, 97.5])
+    null_mean = float(np.mean(null))
+    null_std = float(np.std(null, ddof=1))
+
+    rows = []
+    for name, obs in finals.items():
+        # guard against None or NaN
+        if obs is None or (isinstance(obs, float) and np.isnan(obs)):
+            rows.append({
+                "strategy": name,
+                "obs_profit": obs,
+                "p_one_sided": np.nan,
+                "p_two_sided": np.nan,
+                "percentile_in_null": np.nan,
+                "null_mean": null_mean,
+                "null_std": null_std,
+                "null_2.5%": lo95,
+                "null_97.5%": hi95,
+                "above_95%_band": False,
+                "below_95%_band": False,
+            })
+            continue
+
+        p1 = p_one_sided(obs, null)
+        p2 = p_two_sided(obs, null)
+        pct = 100.0 * np.mean(null <= obs)
+        rows.append({
+            "strategy": name,
+            "obs_profit": float(obs),
+            "p_one_sided": float(p1),
+            "p_two_sided": float(p2),
+            "percentile_in_null": float(pct),
+            "null_mean": null_mean,
+            "null_std": null_std,
+            "null_2.5%": lo95,
+            "null_97.5%": hi95,
+            "above_95%_band": bool(obs > hi95),
+            "below_95%_band": bool(obs < lo95),
+        })
+
+    summary = pd.DataFrame(rows).sort_values("p_one_sided")
+    print(summary.to_string(index=False, float_format=lambda x: f"{x:,.6f}"))
+
+    # print(f"Cummulative News Sentiment Profit: {cumulative_news_sentiment_profit[-1]}")
 
     cumulative_mean_reversion_profit_per_trade = [
         np.sum(mean_reversion_profit[:i+1]) / np.sum(mean_reversion_num_trades[:i+1]) for i in range(len(mean_reversion_profit))
