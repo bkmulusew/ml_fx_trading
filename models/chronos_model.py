@@ -29,9 +29,10 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
 
     def split_and_scale_data(self, train_ratio=0.5, validation_ratio=0.1):
         """Prepare data with proper train/test split and no data leakage"""
-        data = self.data_processor.prepare_fx_data()
+        data = self.data_processor.prepare_data()
 
-        dates = data["dates"]
+        fx_dates = data["fx_dates"]
+        news_dates = data["news_dates"]
         bid_prices = data["bid_prices"]
         ask_prices = data["ask_prices"]
         news_sentiments = data["news_sentiments"]
@@ -55,13 +56,12 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
 
         # Process test data
         meta = self._align_test_targets(
-            dates=dates,
+            fx_dates=fx_dates,
             bid_prices=bid_prices,
             ask_prices=ask_prices,
-            news_sentiments=news_sentiments
         )
 
-        return (X_test_scaled, *meta)
+        return (X_test_scaled, *meta, news_dates, news_sentiments)
 
     def _align_test_targets(self, **test_series):
         """Process all test data series by applying the input chunk length offset."""

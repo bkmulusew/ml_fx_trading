@@ -75,9 +75,10 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
 
     def split_and_scale_data(self):
         """Splits the data into training, validation, and test sets and applies scaling."""
-        data = self.data_processor.prepare_fx_data()
+        data = self.data_processor.prepare_data()
 
-        dates = data["dates"]
+        fx_dates = data["fx_dates"]
+        news_dates = data["news_dates"]
         bid_prices = data["bid_prices"]
         ask_prices = data["ask_prices"]
         news_sentiments = data["news_sentiments"]
@@ -95,13 +96,12 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
         
         # Process test data
         test_data = self._process_test_data(
-            dates=dates,
+            fx_dates=fx_dates,
             bid_prices=bid_prices,
             ask_prices=ask_prices,
-            news_sentiments=news_sentiments
         )
 
-        return (*scaled_series, *test_data)
+        return (*scaled_series, *test_data, news_dates, news_sentiments)
     
     def _process_test_data(self, **test_series):
         """Process all test data series by applying the input chunk length offset."""

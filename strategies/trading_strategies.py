@@ -2,6 +2,7 @@ import numpy as np
 from xgboost import XGBClassifier
 from utils import TradingUtils
 from collections import Counter
+import datetime
 
 class TradingStrategy():
     """Trading Strategy for Supervised Learning based models, implementing different trading strategies using Kelly criterion for optimal bet sizing."""
@@ -32,13 +33,13 @@ class TradingStrategy():
 
         # New: Track open positions
         self.open_positions = {
-            'mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0},
-            'trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0},
-            'pure_forcasting': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0},
-            'hybrid_mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0},
-            'hybrid_trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0},
-            'news_sentiment': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0},
-            'ensemble': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0},
+            'mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
+            'trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
+            'pure_forcasting': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
+            'hybrid_mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
+            'hybrid_trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
+            'news_sentiment': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
+            'ensemble': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0},
         }
 
         # Minimum hold bars for news sentiment strategy
@@ -122,11 +123,6 @@ class TradingStrategy():
 
         # Check if there's an open position
         if position['type'] is not None:
-            if strategy_name == 'news_sentiment':
-                min_hold_bars = self.news_min_hold_bars
-                if position['bars_held'] < min_hold_bars:
-                    position['bars_held'] += 1
-                    return
             # Close the position
             self.close_position(strategy_name, sell_price, buy_price)
         
@@ -154,7 +150,6 @@ class TradingStrategy():
                         'size_a': bet_size_a,
                         'size_b': bet_size_b,
                         'entry_ratio': buy_price,
-                        'bars_held': 0
                     }
                 else:
                     print(f"Not enough B to buy {bet_size_a} currency A")
@@ -172,7 +167,6 @@ class TradingStrategy():
                         'size_a': bet_size_a,
                         'size_b': bet_size_b,
                         'entry_ratio': sell_price,
-                        'bars_held': 0
                     }
                 else:
                     print(f"Not enough A to sell {bet_size_a} currency A")
@@ -211,7 +205,7 @@ class TradingStrategy():
             self.wallet_a[strategy_name] += position['size_a']
         
         # Reset position tracking
-        self.open_positions[strategy_name] = {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'bars_held': 0}
+        self.open_positions[strategy_name] = {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0}
 
         # Update profit tracking
         self.num_trades[strategy_name] += 1
@@ -225,7 +219,7 @@ class TradingStrategy():
             self.num_losses[strategy_name] += 1
             self.total_losses[strategy_name] += abs(profit_in_curr_a)
     
-    def determine_trade_direction(self, strategy_name, base_pct_change, pred_pct_change, llm_sentiment):
+    def determine_trade_direction(self, strategy_name, base_pct_change, pred_pct_change):
         """Determine the trade direction based on strategy and ratio changes."""
         trade_direction = 'no_trade'
 
@@ -259,11 +253,11 @@ class TradingStrategy():
             elif base_pct_change > 0 and pred_pct_change > 0:
                 trade_direction = 'buy_currency_a'
 
-        elif(strategy_name == 'news_sentiment'):
-            if(llm_sentiment == -1):
-                trade_direction = 'buy_currency_a'
-            elif(llm_sentiment == 1):
-                trade_direction = 'sell_currency_a'
+        # elif(strategy_name == 'news_sentiment'):
+        #     if(llm_sentiment == -1):
+        #         trade_direction = 'buy_currency_a'
+        #     elif(llm_sentiment == 1):
+        #         trade_direction = 'sell_currency_a'
             
         return trade_direction
 
@@ -349,7 +343,7 @@ class TradingStrategy():
         """Display the number of trades for each strategy."""
         print(f"Number of trades - {self.num_trades}")
     
-    def _generate_training_data(self, actual_rates, pred_rates, llm_sentiments):
+    def _generate_training_data(self, actual_rates, pred_rates):
         X, y = [], []
         base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
 
@@ -367,7 +361,7 @@ class TradingStrategy():
 
         return list(zip(X, y))
         
-    def _execute_trading_strategy(self, strategy_name, actual_rates, pred_rates, bid_prices, ask_prices, llm_sentiments):
+    def _execute_trading_strategy(self, strategy_name, actual_rates, pred_rates, bid_prices, ask_prices):
         """Helper method to execute trading for a specific strategy."""
         base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
         
@@ -377,14 +371,14 @@ class TradingStrategy():
 
             base_pct_inc = base_pct_incs[i]
             pred_pct_inc = pred_pct_incs[i]
-            llm_sentiment = llm_sentiments[i]
+            # llm_sentiment = llm_sentiments[i]
 
             # Calculate Kelly fraction
             f_i = self.kelly_criterion(strategy_name)
             
             # Determine trade direction
             trade_direction = self.determine_trade_direction(
-                strategy_name, base_pct_inc, pred_pct_inc, llm_sentiment
+                strategy_name, base_pct_inc, pred_pct_inc
             )
 
             # Execute trade
@@ -444,27 +438,40 @@ class TradingStrategy():
                     
                 self.close_position(strategy_name, sell_price, buy_price)
 
-    def simulate_trading_with_strategies(self, actual_rates, pred_rates, bid_prices, ask_prices, llm_sentiments):
+    def simulate_trading_with_strategies(self, fx_dates, actual_rates, pred_rates, bid_prices, ask_prices, news_dates, news_sentiments):
         """Simulate trading over a series of exchange rates using different strategies."""
+
+        # Identify all FX timestamps that fall within normal market hours (09:00–17:00)
+        in_window_ts = [
+            (i, ts)
+            for i, ts in enumerate(fx_dates)
+            if datetime.time(9, 0) <= ts.time() <= datetime.time(17, 0)
+        ]
+
+        # Require at least a start and end point within the market hours.
+        # If fewer than two timestamps are found, a valid test period cannot be constructed.
+        if len(in_window_ts) < 2:
+            print(f"Not enough in-window points found in the market hours for date {fx_dates[0].date()}.")
+            return
 
         strategy_name = "ensemble"
         
-        # Phase 1: Data preparation and splitting
-        split_idx = len(actual_rates) // 2
+        # Phase 1: Split data into training (before first in-window point) and testing (between first and last in-window points) for training ensemble model
+        (first_idx, first_ts), (last_idx, last_ts) = in_window_ts[0], in_window_ts[-1]
         
-        actual_rates_train = actual_rates[:split_idx]
-        pred_rates_train = pred_rates[:split_idx]
-        llm_sentiments_train = llm_sentiments[:split_idx]
+        actual_rates_train = actual_rates[:first_idx]
+        pred_rates_train = pred_rates[:first_idx]
+        news_sentiments_train = news_sentiments[:first_idx]
         
-        actual_rates_test = actual_rates[split_idx:]
-        pred_rates_test = pred_rates[split_idx:]
-        bid_prices_test = bid_prices[split_idx:]
-        ask_prices_test = ask_prices[split_idx:]
-        llm_sentiments_test = llm_sentiments[split_idx:]
+        actual_rates_test = actual_rates[first_idx:last_idx + 1]
+        pred_rates_test = pred_rates[first_idx:last_idx + 1]
+        bid_prices_test = bid_prices[first_idx:last_idx + 1]
+        ask_prices_test = ask_prices[first_idx:last_idx + 1]
+        news_sentiments_test = news_sentiments[first_idx:last_idx + 1]
 
         # Phase 2: Train ensemble model
         print("Training ensemble model...")
-        historical_data = self._generate_training_data(actual_rates_train, pred_rates_train, llm_sentiments_train)
+        historical_data = self._generate_training_data(actual_rates_train, pred_rates_train)
         print(f"Length of historical_data: {len(historical_data)}")
         self.train_ensemble_model(historical_data)
 
@@ -473,17 +480,17 @@ class TradingStrategy():
         self._execute_ensemble_strategy(actual_rates_test, pred_rates_test, bid_prices_test, ask_prices_test)
         
         print("Executing base strategies...")
-        base_strategy_names = ['mean_reversion', 'trend', 'pure_forcasting', 'hybrid_mean_reversion', 'hybrid_trend', 'news_sentiment']
+        base_strategy_names = ['mean_reversion', 'trend', 'pure_forcasting', 'hybrid_mean_reversion', 'hybrid_trend']
         for strategy_name in base_strategy_names:
             self._execute_trading_strategy(strategy_name, actual_rates_test, pred_rates_test, 
-                                         bid_prices_test, ask_prices_test, llm_sentiments_test)
+                                         bid_prices_test, ask_prices_test)
             
          # Phase 4: Close remaining positions and calculate results
         all_strategy_names = base_strategy_names + ['ensemble']
         self._close_all_remaining_positions(all_strategy_names, bid_prices_test, ask_prices_test)
 
         # Calculate Sharpe ratios for selected strategies
-        selected_strategies = ['mean_reversion', 'trend', 'pure_forcasting', 'news_sentiment', 'ensemble']
+        selected_strategies = ['mean_reversion', 'trend', 'pure_forcasting', 'ensemble']
         for strategy_name in selected_strategies:
             self.sharpe_ratios[strategy_name] = TradingUtils.calculate_sharpe_ratio(self.trade_returns[strategy_name])
 
