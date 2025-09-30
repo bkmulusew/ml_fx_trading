@@ -14,8 +14,9 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
 
     def initialize_model(self, model_name):
         """Creates the model."""
+        print(f"\nLoading {model_name} model...")
         if model_name == "nbeats":
-            return NBEATSModel(
+            model = NBEATSModel(
                 input_chunk_length=self.model_config.INPUT_CHUNK_LENGTH,
                 output_chunk_length=self.model_config.OUTPUT_CHUNK_LENGTH,
                 num_layers=5,
@@ -33,7 +34,7 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
                 },
             )
         elif model_name == "nhits":
-            return NHiTSModel(
+            model = NHiTSModel(
                 input_chunk_length=self.model_config.INPUT_CHUNK_LENGTH,
                 output_chunk_length=self.model_config.OUTPUT_CHUNK_LENGTH,
                 num_layers=5,
@@ -51,7 +52,7 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
                 },
             )
         elif model_name == "tcn":
-            return TCNModel(
+            model = TCNModel(
                 input_chunk_length=self.model_config.INPUT_CHUNK_LENGTH,
                 output_chunk_length=self.model_config.OUTPUT_CHUNK_LENGTH,
                 kernel_size = 3,
@@ -72,13 +73,15 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
         else:
             raise ValueError("Invalid model name.")
 
+        print(f"{model_name} model loaded successfully!")
+        return model
 
     def split_and_scale_data(self):
         """Splits the data into training, validation, and test sets and applies scaling."""
         data = self.data_processor.prepare_data()
 
-        fx_dates = data["fx_dates"]
-        news_dates = data["news_dates"]
+        fx_timestamps = data["fx_timestamps"]
+        news_timestamps = data["news_timestamps"]
         bid_prices = data["bid_prices"]
         ask_prices = data["ask_prices"]
         news_sentiments = data["news_sentiments"]
@@ -96,12 +99,12 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
         
         # Process test data
         test_data = self._process_test_data(
-            fx_dates=fx_dates,
+            fx_timestamps=fx_timestamps,
             bid_prices=bid_prices,
             ask_prices=ask_prices,
         )
 
-        return (*scaled_series, *test_data, news_dates, news_sentiments)
+        return (*scaled_series, *test_data, news_timestamps, news_sentiments)
     
     def _process_test_data(self, **test_series):
         """Process all test data series by applying the input chunk length offset."""

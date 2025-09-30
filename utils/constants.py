@@ -18,5 +18,5 @@ class ModelConfig:
     USE_FRAC_KELLY: bool = True
     ENABLE_TRANSACTION_COSTS: bool = False
     OUTPUT_DIR: str = "results/usd-cnh"
-    NEWS_MIN_HOLD_BARS: int = 3
+    HOLD_MINUTES: int = 3
     SENTIMENT_SOURCE: str = "competitor_label"

@@ -14,15 +14,15 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.MODEL_NAME = "autogluon/chronos-bolt-base"
         self.PRESET_NAME = "bolt_base"
-        print(f"Initializing Chronos-Bolt with context length {self.model_config.INPUT_CHUNK_LENGTH},\n"
-              f"batch size {self.model_config.BATCH_SIZE} and prediction length {self.model_config.OUTPUT_CHUNK_LENGTH}")
         self.forecaster = self.initialize_model()
 
 
     def initialize_model(self):
         """Load pre-trained predictor"""
         try:
+            print(f"\nLoading Chronos-Bolt model...")
             pipeline = ChronosBoltPipeline.from_pretrained(self.MODEL_NAME)
+            print("Chronos-Bolt model loaded successfully!")
             return pipeline
         except Exception as e:
             print(f"Error initializing Chronos model: {e}")
@@ -31,8 +31,8 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
         """Prepare data with proper train/test split and no data leakage"""
         data = self.data_processor.prepare_data()
 
-        fx_dates = data["fx_dates"]
-        news_dates = data["news_dates"]
+        fx_timestamps = data["fx_timestamps"]
+        news_timestamps = data["news_timestamps"]
         bid_prices = data["bid_prices"]
         ask_prices = data["ask_prices"]
         news_sentiments = data["news_sentiments"]
@@ -56,12 +56,12 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
 
         # Process test data
         meta = self._align_test_targets(
-            fx_dates=fx_dates,
+            fx_timestamps=fx_timestamps,
             bid_prices=bid_prices,
             ask_prices=ask_prices,
         )
 
-        return (X_test_scaled, *meta, news_dates, news_sentiments)
+        return (X_test_scaled, *meta, news_timestamps, news_sentiments)
 
     def _align_test_targets(self, **test_series):
         """Process all test data series by applying the input chunk length offset."""

@@ -37,12 +37,12 @@ class DataProcessor:
         news_data_train, news_data_val, news_data_test = self.load_news_data()
         
         # Extract ts data into respective lists
-        fx_dates = fx_data_test["date"].tolist()
+        fx_timestamps = fx_data_test["date"].tolist()
         bid_prices = fx_data_test["bid_price"].tolist()
         ask_prices = fx_data_test["ask_price"].tolist()
 
         # Extract news data into respective lists
-        news_dates = news_data_test["date"].tolist()
+        news_timestamps = news_data_test["date"].tolist()
         news_sentiments = news_data_test[self.model_config.SENTIMENT_SOURCE].tolist()
         
         if self.model_config.MODEL_NAME == 'toto' or self.model_config.MODEL_NAME == 'chronos':
@@ -55,8 +55,8 @@ class DataProcessor:
             mid_price_series_test = TimeSeries.from_dataframe(fx_data_test, value_cols=["mid_price"])
 
         return {
-            "fx_dates": fx_dates,
-            "news_dates": news_dates,
+            "fx_timestamps": fx_timestamps,
+            "news_timestamps": news_timestamps,
             "bid_prices": bid_prices,
             "ask_prices": ask_prices,
             "mid_price_series": {

@@ -38,39 +38,38 @@ def plot_prediction_comparison(true_values, predicted_values, model_config):
     plt.savefig(f'{model_config.OUTPUT_DIR}/true_vs_predicted_{model_config.MODEL_NAME}.png', dpi=300, bbox_inches='tight')
     plt.clf()
 
-def group_data_by_date(fx_dates, news_dates, true_values, predicted_values, bid_prices, ask_prices, news_sentiments):
+def group_data_by_date(fx_timestamps, news_timestamps, true_values, predicted_values, bid_prices, ask_prices, news_sentiments):
     """Group all test data by date for trading simulation."""
-    # Parse test_dates into datetime objects
-    
+
     # Create a dictionary to group values by date
     chunked_values = defaultdict(lambda: {
-        "fx_dates": [],
-        "news_dates": [],
+        "fx_timestamps": [],
+        "news_timestamps": [],
         "true_values": [],
         "predicted_values": [],
-        "bid_price": [],
-        "ask_price": [], 
+        "bid_prices": [],
+        "ask_prices": [], 
         "news_sentiments": []
     })
-    
+
     # Chunk data by date
-    for fx_date, true_val, pred_val, bid_price, ask_price in zip(
-            fx_dates, true_values, predicted_values, bid_prices, ask_prices
+    for fx_timestamp, true_val, pred_val, bid_price, ask_price in zip(
+            fx_timestamps, true_values, predicted_values, bid_prices, ask_prices
         ):
-        date_key = fx_date.date()  # Use only the date part as the key
-        chunked_values[date_key]["fx_dates"].append(fx_date)
+        date_key = fx_timestamp.date()  # Use only the date part as the key
+        chunked_values[date_key]["fx_timestamps"].append(fx_timestamp)
         chunked_values[date_key]["true_values"].append(true_val)
         chunked_values[date_key]["predicted_values"].append(pred_val)
-        chunked_values[date_key]["bid_price"].append(bid_price)
-        chunked_values[date_key]["ask_price"].append(ask_price)
+        chunked_values[date_key]["bid_prices"].append(bid_price)
+        chunked_values[date_key]["ask_prices"].append(ask_price)
 
-    for news_date, news_sentiment in zip(
-            news_dates, news_sentiments
+    for news_timestamp, news_sentiment in zip(
+            news_timestamps, news_sentiments
         ):
-        date_key = news_date.date()  # Use only the date part as the key
+        date_key = news_timestamp.date()  # Use only the date part as the key
         if date_key not in chunked_values:
             print(f"News Date key not found: {date_key}")
-        chunked_values[date_key]["news_dates"].append(news_date)
+        chunked_values[date_key]["news_timestamps"].append(news_timestamp)
         chunked_values[date_key]["news_sentiments"].append(news_sentiment)
     
     return chunked_values
@@ -87,33 +86,32 @@ def run_sl_based_trading_strategy(model_config):
     # Train model and get predictions
     if model_config.MODEL_NAME == 'toto':
         predictor = TotoFinancialForecastingModel(dataProcessor, model_config)
-        test_series, test_fx_dates, test_bid_prices, test_ask_prices, test_news_dates, test_news_sentiments = predictor.split_and_scale_data()
+        test_series, test_fx_timestamps, test_bid_prices, test_ask_prices, test_news_timestamps, test_news_sentiments = predictor.split_and_scale_data()
         predicted_values = predictor.generate_predictions(test_series)
         true_values = predictor.test_mid_prices
     elif model_config.MODEL_NAME == 'chronos':
         predictor = ChronosFinancialForecastingModel(dataProcessor, model_config)
-        test_series, test_fx_dates, test_bid_prices, test_ask_prices, test_news_dates, test_news_sentiments = predictor.split_and_scale_data()
+        test_series, test_fx_timestamps, test_bid_prices, test_ask_prices, test_news_timestamps, test_news_sentiments = predictor.split_and_scale_data()
         predicted_values = predictor.generate_predictions(test_series)
         true_values = predictor.test_mid_prices
     else:
         predictor = DartsFinancialForecastingModel(dataProcessor, model_config)
-        train_series, valid_series, test_series, test_fx_dates, test_bid_prices, test_ask_prices, test_news_dates, test_news_sentiments = predictor.split_and_scale_data()
+        train_series, valid_series, test_series, test_fx_timestamps, test_bid_prices, test_ask_prices, test_news_timestamps, test_news_sentiments = predictor.split_and_scale_data()
         predictor.train(train_series, valid_series)
         predicted_values = predictor.generate_predictions(test_series)
         true_values = predictor.test_mid_prices
 
     # Calculate and print the prediction error.
-    print(f"Model: {model_config.MODEL_NAME}")
     prediction_error_model = eval_metrics.calculate_prediction_error(predicted_values, true_values)
-    print(f"Prediction Error for {model_config.MODEL_NAME}: {prediction_error_model}")
+    print(f"\nPrediction Error for {model_config.MODEL_NAME}: {prediction_error_model}")
     print (f"\n")
 
     plot_prediction_comparison(true_values, predicted_values, model_config)
 
     # Group data by date for trading simulation
     chunked_values = group_data_by_date(
-        test_fx_dates,
-        test_news_dates,
+        test_fx_timestamps,
+        test_news_timestamps,
         true_values,
         predicted_values,
         test_bid_prices,
@@ -126,6 +124,7 @@ def run_sl_based_trading_strategy(model_config):
     print("--------------------------------")
     print("Using Kelly")
     print("--------------------------------")
+    print("\n")
     mean_reversion_profit = []
     trend_profit = []
     forecasting_profit = []
@@ -162,28 +161,28 @@ def run_sl_based_trading_strategy(model_config):
         if (len(values['true_values']) < 7):
             continue
 
-        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.NEWS_MIN_HOLD_BARS, True, model_config.ENABLE_TRANSACTION_COSTS)
-        trading_strategy.simulate_trading_with_strategies(values['fx_dates'], values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["news_dates"], values["news_sentiments"])
+        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.HOLD_MINUTES, True, model_config.ENABLE_TRANSACTION_COSTS)
+        trading_strategy.simulate_trading_with_strategies(values['fx_timestamps'], values['true_values'], values['predicted_values'], values['bid_prices'], values['ask_prices'], values["news_timestamps"], values["news_sentiments"])
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
         forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])
         hybrid_mean_reversion_profit.append(trading_strategy.total_profit_or_loss["hybrid_mean_reversion"])
         hybrid_trend_profit.append(trading_strategy.total_profit_or_loss["hybrid_trend"])
-        # news_sentiment_profit.append(trading_strategy.total_profit_or_loss["news_sentiment"])
+        news_sentiment_profit.append(trading_strategy.total_profit_or_loss["news_sentiment"])
         ensemble_profit.append(trading_strategy.total_profit_or_loss["ensemble"])
         mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["mean_reversion"] / trading_strategy.num_trades["mean_reversion"]
         trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["trend"] / trading_strategy.num_trades["trend"]
         forecasting_profit_per_trade_val = trading_strategy.total_profit_or_loss["pure_forcasting"] / trading_strategy.num_trades["pure_forcasting"]
         hybrid_mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["hybrid_mean_reversion"] / trading_strategy.num_trades["hybrid_mean_reversion"]
         hybrid_trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["hybrid_trend"] / trading_strategy.num_trades["hybrid_trend"]
-        # news_sentiment_profit_per_trade_val = trading_strategy.total_profit_or_loss["news_sentiment"] / trading_strategy.num_trades["news_sentiment"]
+        news_sentiment_profit_per_trade_val = trading_strategy.total_profit_or_loss["news_sentiment"] / trading_strategy.num_trades["news_sentiment"]
         ensemble_profit_per_trade_val = trading_strategy.total_profit_or_loss["ensemble"] / trading_strategy.num_trades["ensemble"]
         mean_reversion_profit_per_trade.append(mean_reversion_profit_per_trade_val)
         trend_profit_per_trade.append(trend_profit_per_trade_val)
         forecasting_profit_per_trade.append(forecasting_profit_per_trade_val)
         hybrid_mean_reversion_profit_per_trade.append(hybrid_mean_reversion_profit_per_trade_val)
         hybrid_trend_profit_per_trade.append(hybrid_trend_profit_per_trade_val)
-        # news_sentiment_profit_per_trade.append(news_sentiment_profit_per_trade_val)
+        news_sentiment_profit_per_trade.append(news_sentiment_profit_per_trade_val)
         ensemble_profit_per_trade.append(ensemble_profit_per_trade_val)
 
         mean_reversion_num_trades.append(trading_strategy.num_trades["mean_reversion"])
@@ -191,7 +190,7 @@ def run_sl_based_trading_strategy(model_config):
         forecasting_num_trades.append(trading_strategy.num_trades["pure_forcasting"])
         hybrid_mean_reversion_num_trades.append(trading_strategy.num_trades["hybrid_mean_reversion"])
         hybrid_trend_num_trades.append(trading_strategy.num_trades["hybrid_trend"])
-        # news_sentiment_num_trades.append(trading_strategy.num_trades["news_sentiment"])
+        news_sentiment_num_trades.append(trading_strategy.num_trades["news_sentiment"])
         ensemble_num_trades.append(trading_strategy.num_trades["ensemble"])
 
         mean_reversion_sharpe_ratios.append(trading_strategy.sharpe_ratios["mean_reversion"])
@@ -199,7 +198,7 @@ def run_sl_based_trading_strategy(model_config):
         forecasting_sharpe_ratios.append(trading_strategy.sharpe_ratios["pure_forcasting"])
         hybrid_mean_reversion_sharpe_ratios.append(trading_strategy.sharpe_ratios["hybrid_mean_reversion"])
         hybrid_trend_sharpe_ratios.append(trading_strategy.sharpe_ratios["hybrid_trend"])
-        # news_sentiment_sharpe_ratios.append(trading_strategy.sharpe_ratios["news_sentiment"])
+        news_sentiment_sharpe_ratios.append(trading_strategy.sharpe_ratios["news_sentiment"])
         ensemble_sharpe_ratios.append(trading_strategy.sharpe_ratios["ensemble"])
             
     cumulative_mean_reversion_profit = np.cumsum(mean_reversion_profit)
@@ -207,10 +206,11 @@ def run_sl_based_trading_strategy(model_config):
     cumulative_forecasting_profit = np.cumsum(forecasting_profit)
     cumulative_hybrid_mean_reversion_profit = np.cumsum(hybrid_mean_reversion_profit)
     cumulative_hybrid_trend_profit = np.cumsum(hybrid_trend_profit)
-    # cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
+    cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
     cumulative_ensemble_profit = np.cumsum(ensemble_profit)
 
-    # print(f"Cummulative News Sentiment Profit: {cumulative_news_sentiment_profit[-1]}")
+    print(f"Cummulative News Sentiment Profit: {cumulative_news_sentiment_profit[-1]}")
+    print(f"Number of news sentiment trades: {sum(news_sentiment_num_trades)}")
 
     cumulative_mean_reversion_profit_per_trade = [
         np.sum(mean_reversion_profit[:i+1]) / np.sum(mean_reversion_num_trades[:i+1]) for i in range(len(mean_reversion_profit))
@@ -227,9 +227,9 @@ def run_sl_based_trading_strategy(model_config):
     cumulative_hybrid_trend_profit_per_trade = [
         np.sum(hybrid_trend_profit[:i+1]) / np.sum(hybrid_trend_num_trades[:i+1]) for i in range(len(hybrid_trend_profit))
     ]
-    # cumulative_news_sentiment_profit_per_trade = [
-    #     np.sum(news_sentiment_profit[:i+1]) / np.sum(news_sentiment_num_trades[:i+1]) for i in range(len(news_sentiment_profit))
-    # ]
+    cumulative_news_sentiment_profit_per_trade = [
+        np.sum(news_sentiment_profit[:i+1]) / np.sum(news_sentiment_num_trades[:i+1]) for i in range(len(news_sentiment_profit))
+    ]
     cumulative_ensemble_profit_per_trade = [
         np.sum(ensemble_profit[:i+1]) / np.sum(ensemble_num_trades[:i+1]) for i in range(len(ensemble_profit))
     ]
@@ -239,7 +239,7 @@ def run_sl_based_trading_strategy(model_config):
     plt.plot(cumulative_forecasting_profit_per_trade, color='red', label=f'Cumulative Forecasting Profit Per Trade {model_config.MODEL_NAME}')
     plt.plot(cumulative_hybrid_mean_reversion_profit_per_trade, color='green', label='Cumulative Hybrid Mean Reversion Profit Per Trade')
     plt.plot(cumulative_hybrid_trend_profit_per_trade, color='brown', label='Cumulative Hybrid Trend Profit Per Trade')
-    # plt.plot(cumulative_news_sentiment_profit_per_trade, color='pink', label='Cumulative News Sentiment Profit Per Trade')
+    plt.plot(cumulative_news_sentiment_profit_per_trade, color='pink', label='Cumulative News Sentiment Profit Per Trade')
     plt.plot(cumulative_ensemble_profit_per_trade, color='orange', label='Cumulative Ensemble Profit Per Trade')
     plt.title('Cumulative Profits Per Trade Using Kelly')
     plt.xlabel('Observation')
@@ -254,7 +254,7 @@ def run_sl_based_trading_strategy(model_config):
     plt.plot(cumulative_forecasting_profit, color='red', label=f'Cumulative Forecasting Profit {model_config.MODEL_NAME}')
     plt.plot(cumulative_hybrid_mean_reversion_profit, color='green', label='Cumulative Hybrid Mean Reversion Profit')
     plt.plot(cumulative_hybrid_trend_profit, color='brown', label='Cumulative Hybrid Trend Profit')
-    # plt.plot(cumulative_news_sentiment_profit, color='pink', label='Cumulative News Sentiment Profit')
+    plt.plot(cumulative_news_sentiment_profit, color='pink', label='Cumulative News Sentiment Profit')
     plt.plot(cumulative_ensemble_profit, color='orange', label='Cumulative Ensemble Profit')
     plt.title('Cumulative Profits Using Kelly')
     plt.xlabel('Observation')
@@ -269,7 +269,7 @@ def run_sl_based_trading_strategy(model_config):
     plt.plot(forecasting_profit, color='red', label=f'Forcasting Profit {model_config.MODEL_NAME}')
     plt.plot(hybrid_mean_reversion_profit, color='green', label='Hybrid Mean Reversion Profit')
     plt.plot(hybrid_trend_profit, color='brown', label='Hybrid Trend Profit')
-    # plt.plot(news_sentiment_profit, color='pink', label='News Sentiment Profit')
+    plt.plot(news_sentiment_profit, color='pink', label='News Sentiment Profit')
     plt.plot(ensemble_profit, color='orange', label='Ensemble Profit')
     plt.title('Profits Using Kelly')
     plt.xlabel('Observation')
@@ -284,7 +284,7 @@ def run_sl_based_trading_strategy(model_config):
     plt.plot(forecasting_profit_per_trade, color = 'red', label = f'Forcasting Profit Per Trade {model_config.MODEL_NAME}')
     plt.plot(hybrid_mean_reversion_profit_per_trade, color='green', label='Hybrid Mean Reversion Profit Per Trade')
     plt.plot(hybrid_trend_profit_per_trade, color='brown', label='Hybrid Trend Profit Per Trade')
-    # plt.plot(news_sentiment_profit_per_trade, color='pink', label='News Sentiment Profit Per Trade')
+    plt.plot(news_sentiment_profit_per_trade, color='pink', label='News Sentiment Profit Per Trade')
     plt.plot(ensemble_profit_per_trade, color='orange', label='Ensemble Profit Per Trade')
     plt.title('Profit Per Trade Using Kelly')
     plt.xlabel('Observation')
@@ -299,7 +299,7 @@ def run_sl_based_trading_strategy(model_config):
     plt.plot(forecasting_sharpe_ratios, color='red', label=f'Forecasting Sharpe Ratio {model_config.MODEL_NAME}')
     plt.plot(hybrid_mean_reversion_sharpe_ratios, color='green', label='Hybrid Mean Reversion Sharpe Ratio')
     plt.plot(hybrid_trend_sharpe_ratios, color='brown', label='Hybrid Trend Sharpe Ratio')
-    # plt.plot(news_sentiment_sharpe_ratios, color='pink', label='News Sentiment Sharpe Ratio')
+    plt.plot(news_sentiment_sharpe_ratios, color='pink', label='News Sentiment Sharpe Ratio')
     plt.plot(ensemble_sharpe_ratios, color='orange', label='Ensemble Sharpe Ratio')
     plt.title('Sharpe Ratios Using Kelly')
     plt.xlabel('Observation')
@@ -315,7 +315,7 @@ def run_sl_based_trading_strategy(model_config):
     print("--------------------------------")
     print("Using Fixed Position")
     print("--------------------------------")
-
+    print("\n")
     mean_reversion_profit = []
     trend_profit = []
     forecasting_profit = []
@@ -352,28 +352,28 @@ def run_sl_based_trading_strategy(model_config):
         if (len(values['true_values']) < 7):
             continue
 
-        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.NEWS_MIN_HOLD_BARS, False, model_config.ENABLE_TRANSACTION_COSTS)
-        trading_strategy.simulate_trading_with_strategies(values['fx_dates'], values['true_values'], values['predicted_values'], values['bid_price'], values['ask_price'], values["news_dates"], values["news_sentiments"])
+        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.HOLD_MINUTES, False, model_config.ENABLE_TRANSACTION_COSTS)
+        trading_strategy.simulate_trading_with_strategies(values['fx_timestamps'], values['true_values'], values['predicted_values'], values['bid_prices'], values['ask_prices'], values["news_timestamps"], values["news_sentiments"])
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
         forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])
         hybrid_mean_reversion_profit.append(trading_strategy.total_profit_or_loss["hybrid_mean_reversion"])
         hybrid_trend_profit.append(trading_strategy.total_profit_or_loss["hybrid_trend"])
-        # news_sentiment_profit.append(trading_strategy.total_profit_or_loss["news_sentiment"])
+        news_sentiment_profit.append(trading_strategy.total_profit_or_loss["news_sentiment"])
         ensemble_profit.append(trading_strategy.total_profit_or_loss["ensemble"])
         mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["mean_reversion"] / trading_strategy.num_trades["mean_reversion"]
         trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["trend"] / trading_strategy.num_trades["trend"]
         forecasting_profit_per_trade_val = trading_strategy.total_profit_or_loss["pure_forcasting"] / trading_strategy.num_trades["pure_forcasting"]
         hybrid_mean_reversion_profit_per_trade_val = trading_strategy.total_profit_or_loss["hybrid_mean_reversion"] / trading_strategy.num_trades["hybrid_mean_reversion"]
         hybrid_trend_profit_per_trade_val = trading_strategy.total_profit_or_loss["hybrid_trend"] / trading_strategy.num_trades["hybrid_trend"]
-        # news_sentiment_profit_per_trade_val = trading_strategy.total_profit_or_loss["news_sentiment"] / trading_strategy.num_trades["news_sentiment"]
+        news_sentiment_profit_per_trade_val = trading_strategy.total_profit_or_loss["news_sentiment"] / trading_strategy.num_trades["news_sentiment"]
         ensemble_profit_per_trade_val = trading_strategy.total_profit_or_loss["ensemble"] / trading_strategy.num_trades["ensemble"]
         mean_reversion_profit_per_trade.append(mean_reversion_profit_per_trade_val)
         trend_profit_per_trade.append(trend_profit_per_trade_val)
         forecasting_profit_per_trade.append(forecasting_profit_per_trade_val)
         hybrid_mean_reversion_profit_per_trade.append(hybrid_mean_reversion_profit_per_trade_val)
         hybrid_trend_profit_per_trade.append(hybrid_trend_profit_per_trade_val)
-        # news_sentiment_profit_per_trade.append(news_sentiment_profit_per_trade_val)
+        news_sentiment_profit_per_trade.append(news_sentiment_profit_per_trade_val)
         ensemble_profit_per_trade.append(ensemble_profit_per_trade_val)
 
         mean_reversion_num_trades.append(trading_strategy.num_trades["mean_reversion"])
@@ -381,7 +381,7 @@ def run_sl_based_trading_strategy(model_config):
         forecasting_num_trades.append(trading_strategy.num_trades["pure_forcasting"])
         hybrid_mean_reversion_num_trades.append(trading_strategy.num_trades["hybrid_mean_reversion"])
         hybrid_trend_num_trades.append(trading_strategy.num_trades["hybrid_trend"])
-        # news_sentiment_num_trades.append(trading_strategy.num_trades["news_sentiment"])
+        news_sentiment_num_trades.append(trading_strategy.num_trades["news_sentiment"])
         ensemble_num_trades.append(trading_strategy.num_trades["ensemble"])
 
         mean_reversion_sharpe_ratios.append(trading_strategy.sharpe_ratios["mean_reversion"])
@@ -389,7 +389,7 @@ def run_sl_based_trading_strategy(model_config):
         forecasting_sharpe_ratios.append(trading_strategy.sharpe_ratios["pure_forcasting"])
         hybrid_mean_reversion_sharpe_ratios.append(trading_strategy.sharpe_ratios["hybrid_mean_reversion"])
         hybrid_trend_sharpe_ratios.append(trading_strategy.sharpe_ratios["hybrid_trend"])
-        # news_sentiment_sharpe_ratios.append(trading_strategy.sharpe_ratios["news_sentiment"])
+        news_sentiment_sharpe_ratios.append(trading_strategy.sharpe_ratios["news_sentiment"])
         ensemble_sharpe_ratios.append(trading_strategy.sharpe_ratios["ensemble"])
             
     cumulative_mean_reversion_profit = np.cumsum(mean_reversion_profit)
@@ -397,8 +397,11 @@ def run_sl_based_trading_strategy(model_config):
     cumulative_forecasting_profit = np.cumsum(forecasting_profit)
     cumulative_hybrid_mean_reversion_profit = np.cumsum(hybrid_mean_reversion_profit)
     cumulative_hybrid_trend_profit = np.cumsum(hybrid_trend_profit)
-    # cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
+    cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
     cumulative_ensemble_profit = np.cumsum(ensemble_profit)
+
+    print(f"Cummulative News Sentiment Profit: {cumulative_news_sentiment_profit[-1]}")
+    print(f"Number of news sentiment trades: {sum(news_sentiment_num_trades)}")
 
     cumulative_mean_reversion_profit_per_trade = [
         np.sum(mean_reversion_profit[:i+1]) / np.sum(mean_reversion_num_trades[:i+1]) for i in range(len(mean_reversion_profit))
@@ -415,9 +418,9 @@ def run_sl_based_trading_strategy(model_config):
     cumulative_hybrid_trend_profit_per_trade = [
         np.sum(hybrid_trend_profit[:i+1]) / np.sum(hybrid_trend_num_trades[:i+1]) for i in range(len(hybrid_trend_profit))
     ]
-    # cumulative_news_sentiment_profit_per_trade = [
-    #     np.sum(news_sentiment_profit[:i+1]) / np.sum(news_sentiment_num_trades[:i+1]) for i in range(len(news_sentiment_profit))
-    # ]
+    cumulative_news_sentiment_profit_per_trade = [
+        np.sum(news_sentiment_profit[:i+1]) / np.sum(news_sentiment_num_trades[:i+1]) for i in range(len(news_sentiment_profit))
+    ]
     cumulative_ensemble_profit_per_trade = [
         np.sum(ensemble_profit[:i+1]) / np.sum(ensemble_num_trades[:i+1]) for i in range(len(ensemble_profit))
     ]
@@ -427,7 +430,7 @@ def run_sl_based_trading_strategy(model_config):
     plt.plot(cumulative_forecasting_profit_per_trade, color='red', label=f'Cumulative Forecasting Profit Per Trade {model_config.MODEL_NAME}')
     plt.plot(cumulative_hybrid_mean_reversion_profit_per_trade, color='green', label='Cumulative Hybrid Mean Reversion Profit Per Trade')
     plt.plot(cumulative_hybrid_trend_profit_per_trade, color='brown', label='Cumulative Hybrid Trend Profit Per Trade')
-    # plt.plot(cumulative_news_sentiment_profit_per_trade, color='pink', label='Cumulative News Sentiment Profit Per Trade')
+    plt.plot(cumulative_news_sentiment_profit_per_trade, color='pink', label='Cumulative News Sentiment Profit Per Trade')
     plt.plot(cumulative_ensemble_profit_per_trade, color='orange', label='Cumulative Ensemble Profit Per Trade')
     plt.title('Cumulative Profits Per Trade Using Fixed Postion Size')
     plt.xlabel('Observation')
@@ -442,7 +445,7 @@ def run_sl_based_trading_strategy(model_config):
     plt.plot(cumulative_forecasting_profit, color='red', label=f'Cumulative Forecasting Profit {model_config.MODEL_NAME}')
     plt.plot(cumulative_hybrid_mean_reversion_profit, color='green', label='Cumulative Hybrid Mean Reversion Profit')
     plt.plot(cumulative_hybrid_trend_profit, color='brown', label='Cumulative Hybrid Trend Profit')
-    # plt.plot(cumulative_news_sentiment_profit, color='pink', label='Cumulative News Sentiment Profit')
+    plt.plot(cumulative_news_sentiment_profit, color='pink', label='Cumulative News Sentiment Profit')
     plt.plot(cumulative_ensemble_profit, color='orange', label='Cumulative Ensemble Profit')
     plt.title('Cumulative Profits Using Fixed Postion Size')
     plt.xlabel('Observation')
@@ -457,7 +460,7 @@ def run_sl_based_trading_strategy(model_config):
     plt.plot(forecasting_profit, color = 'red', label = f'Forcasting Profit {model_config.MODEL_NAME}')
     plt.plot(hybrid_mean_reversion_profit, color='green', label='Hybrid Mean Reversion Profit')
     plt.plot(hybrid_trend_profit, color='brown', label='Hybrid Trend Profit')
-    # plt.plot(news_sentiment_profit, color='pink', label='News Sentiment Profit')
+    plt.plot(news_sentiment_profit, color='pink', label='News Sentiment Profit')
     plt.plot(ensemble_profit, color='orange', label='Ensemble Profit')
     plt.title('Profits Using Fixed Postion Size')
     plt.xlabel('Observation')
@@ -472,7 +475,7 @@ def run_sl_based_trading_strategy(model_config):
     plt.plot(forecasting_profit_per_trade, color = 'red', label = f'Forcasting Profit Per Trade {model_config.MODEL_NAME}')
     plt.plot(hybrid_mean_reversion_profit_per_trade, color='green', label='Hybrid Mean Reversion Profit Per Trade')
     plt.plot(hybrid_trend_profit_per_trade, color='brown', label='Hybrid Trend Profit Per Trade')
-    # plt.plot(news_sentiment_profit_per_trade, color='pink', label='News Sentiment Profit Per Trade')
+    plt.plot(news_sentiment_profit_per_trade, color='pink', label='News Sentiment Profit Per Trade')
     plt.plot(ensemble_profit_per_trade, color='orange', label='Ensemble Profit Per Trade')
     plt.title('Profit Per Trade Using Fixed Postion Size')
     plt.xlabel('Observation')
@@ -487,7 +490,7 @@ def run_sl_based_trading_strategy(model_config):
     plt.plot(forecasting_sharpe_ratios, color='red', label=f'Forecasting Sharpe Ratio {model_config.MODEL_NAME}')
     plt.plot(hybrid_mean_reversion_sharpe_ratios, color='green', label='Hybrid Mean Reversion Sharpe Ratio')
     plt.plot(hybrid_trend_sharpe_ratios, color='brown', label='Hybrid Trend Sharpe Ratio')
-    # plt.plot(news_sentiment_sharpe_ratios, color='pink', label='News Sentiment Sharpe Ratio')
+    plt.plot(news_sentiment_sharpe_ratios, color='pink', label='News Sentiment Sharpe Ratio')
     plt.plot(ensemble_sharpe_ratios, color='orange', label='Ensemble Sharpe Ratio')
     plt.title('Sharpe Ratios Using Fixed Postion Size')
     plt.xlabel('Observation')
@@ -514,7 +517,7 @@ def run(args):
     model_config.WALLET_B = args.wallet_b
     model_config.USE_FRAC_KELLY = args.use_frac_kelly
     model_config.ENABLE_TRANSACTION_COSTS = args.enable_transaction_costs
-    model_config.NEWS_MIN_HOLD_BARS = args.news_min_hold_bars
+    model_config.HOLD_MINUTES = args.hold_minutes
     model_config.SENTIMENT_SOURCE = args.sentiment_source
 
     root_dir = os.path.dirname(os.path.abspath(__file__))
@@ -545,7 +548,7 @@ def print_model_config(config):
     print(f"  Fractional Kelly Enabled  : {config.USE_FRAC_KELLY}")
     print(f"  Transaction Costs Enabled : {config.ENABLE_TRANSACTION_COSTS}")
     print(f"  Output Directory          : {config.OUTPUT_DIR}")
-    print(f"  News Min Hold Bars        : {config.NEWS_MIN_HOLD_BARS}")
+    print(f"  Hold Minutes              : {config.HOLD_MINUTES}")
     print(f"  Sentiment Source          : {config.SENTIMENT_SOURCE}")
 
 if __name__ == "__main__":
@@ -580,10 +583,10 @@ if __name__ == "__main__":
     parser.add_argument("--enable_transaction_costs", action="store_true", help="Enable transaction costs. Default is False.")
     parser.add_argument("--output_dir", type=str, default="results/usd-cny-2023", help="Directory to save all outputs.")
     parser.add_argument(
-        "--news-min-hold-bars",
+        "--hold-minutes",
         type=int,
-        default=3,
-        help="Minimum number of bars to hold news_sentiment positions before allowing exit.",
+        default=-1,
+        help="Number of minutes to hold a position before allowing exit.",
     )
     parser.add_argument(
         "--sentiment_source",

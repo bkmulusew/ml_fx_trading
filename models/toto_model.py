@@ -21,7 +21,7 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
 
     def initialize_model(self):
         """Load pre-trained Toto model and compile it"""
-        print("Loading Toto model...")
+        print("\nLoading Toto model...")
 
         try:
             toto = Toto.from_pretrained('Datadog/Toto-Open-Base-1.0')
@@ -50,8 +50,8 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
         # Extract raw data
         data = self.data_processor.prepare_data()
 
-        fx_dates = data["fx_dates"]
-        news_dates = data["news_dates"]
+        fx_timestamps = data["fx_timestamps"]
+        news_timestamps = data["news_timestamps"]
         bid_prices = data["bid_prices"]
         ask_prices = data["ask_prices"]
         news_sentiments = data["news_sentiments"]
@@ -75,12 +75,12 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
 
         # Process test data
         meta = self._align_test_targets(
-            fx_dates=fx_dates,
+            fx_timestamps=fx_timestamps,
             bid_prices=bid_prices,
             ask_prices=ask_prices,
         )
 
-        return (X_test_scaled, *meta, news_dates, news_sentiments)
+        return (X_test_scaled, *meta, news_timestamps, news_sentiments)
     
     def _align_test_targets(self, **test_series):
         """Process all test data series by applying the input chunk length offset."""
