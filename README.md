@@ -4,46 +4,94 @@
 - [Introduction](#introduction)
 - [Key Features](#key-features)
 - [Dataset](#dataset)
+- [Installation](#installation)
 - [Example Usage](#example-usage)
 
 ## Introduction
-This project implements a financial trading strategy that combines machine learning models and financial theory to predict currency exchange rates and execute trades. By leveraging different supervised learning models, the project aims to optimize financial decision-making through precise prediction and risk management techniques.
+This project implements a machine learning–enhanced foreign exchange (FX) trading system. It combines traditional financial theory with modern forecasting models to predict currency exchange rates and execute trades.  
+
+By leveraging both **historical market data** and **news-driven sentiment signals**, the system supports supervised and zero-shot learning approaches, integrates multiple trading strategies, and applies the Kelly criterion for optimal bet sizing. The overall goal is to improve decision-making in FX trading through accurate predictions, robust risk management, and clear visualization of performance.
 
 ## Key Features
-- Data Processing & Management: The project utilizes a comprehensive data processing pipeline to clean, scale, and split financial time series data, making it ready for model training and evaluation.
-- Model Training & Evaluation: Supports a variety of supervised learning models, including BiLSTM with Attention, Temporal Convolutional Networks (TCN), NBEATS, NHiTS, and Transformers. These models are trained on historical financial data and evaluated for their prediction accuracy.
-- Trading Strategy Implementation: Implements multiple trading strategies, including mean reversion, pure forecasting, and hybrid approaches. Each strategy uses the Kelly criterion for optimal bet sizing, balancing risk and reward to maximize profit.
-- Kelly Criterion for Bet Sizing: The project uses the Kelly criterion to determine the optimal fraction of the wallet to invest in each trade, considering both win/loss probabilities and the expected return. Users can choose between full Kelly and fractional Kelly strategies.
-- Visualization of Predictions: The project includes tools to visualize actual vs. predicted currency exchange rates, allowing users to visually assess model performance and refine strategies.
-- Customizable Trading Thresholds: Users can set specific thresholds to control trade sensitivity, determining when trades should be executed based on changes in predicted currency ratios.
-- Simulation of Trading Strategies: The project simulates trading over a historical period, allowing users to test and refine their strategies before applying them to real-world trading scenarios.
+- Data Processing & Management: Utilizes a comprehensive data processing pipeline to clean, scale, and split financial time series data, making it ready for model training and evaluation.
+- Model Training & Evaluation: Leverages a range of forecasting approaches, training models such as Temporal Convolutional Networks (TCN), NBEATS, and NHiTS on historical financial data. In addition, it incorporates advanced zero-shot forecasters like Toto and Chronos-Bolt, which generate predictions without task-specific training. All models are evaluated for their predictive accuracy and contribution to trading performance.
+- Trading Strategy Implementation: Implements multiple trading strategies, including mean reversion, pure forecasting, hybrid approaches, and news sentiment. Each strategy uses the Kelly criterion for optimal bet sizing, balancing risk and reward to maximize profit.
+- Kelly Criterion for Bet Sizing: Uses Kelly criterion to determine the optimal fraction of the wallet to invest in each trade, considering both win/loss probabilities and the expected return.
+- Visualization of Predictions and Profits: Generates graphs that plot actual versus predicted currency exchange rates alongside profit curves. These visualizations give users an intuitive way to assess model performance, track financial outcomes, and refine trading strategies.
+- Simulation of Trading Strategies: Simulates trading over a historical period, allowing users to test and refine their strategies before applying them to real-world trading scenarios.
 
 ## Dataset
-Before training or evaluating the model and running the trading simulation with different pairs trading strategies, it is necessary to have a dataset. The dataset should be in the following format:
-| date	            | bid_price | ask_price | mid_price | with_prompt | without_prompt |
-| :---                  | :---:  | :---:  | :---:  | :---:  | :---:  |
-| 2/3/2023 16:56	| 6.8004     | 6.8004     | 6.8004     | 0            | 1     |
-| 2/3/2023 16:57	| 6.8038	 | 6.8038	  | 6.8038	   | 0            | 0     |
-| 2/3/2023 16:58	| 6.8036	 | 6.8036	  | 6.8036	   | 1            | 0     |
-| 2/3/2023 16:59	| 6.805	 | 6.805	  | 6.805	   | 0            | 0	  |
+Before training or evaluating the model and running the trading simulation with different pairs trading strategies, it is necessary to prepare two datasets: one for FX market data and another for news sentiment data.
 
-In this dataset:
-- 'date' represents the timestamp of each data point.
-- 'bid_price' represents the bid price from Currency A to Currency B.
-- 'ask_price' represents the ask price from Currency A to Currency B.
-- 'mid_price' represents the mid price (average of bid and ask prices) from Currency A to Currency B.
-- 'with_prompt' represents the LLM's prediction for Currency A direction after being given an article with prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
-- 'without_prompt' represents the LLM's prediction for Currency A direction after being given an article without prompt engineering. Values: 1 (up), 0 (neutral), -1 (down).
+### FX Dataset
+The FX dataset provides the historical exchange rate information and should be formatted as follows:
+
+| date              | bid_price | ask_price | mid_price |
+| :---------------- | :-------: | :-------: | :-------: |
+| 2/3/2023 16:56    | 6.8004    | 6.8004    | 6.8004    |
+| 2/3/2023 16:57    | 6.8038    | 6.8038    | 6.8038    |
+| 2/3/2023 16:58    | 6.8036    | 6.8036    | 6.8036    |
+| 2/3/2023 16:59    | 6.8050    | 6.8050    | 6.8050    |
+
+- **date**: Timestamp of each FX data point.  
+- **bid_price**: Price at which the market is willing to buy Currency B using Currency A.  
+- **ask_price**: Price at which the market is willing to sell Currency B using Currency A.  
+- **mid_price**: Average of bid and ask prices.
+
+---
+
+### News Dataset
+The News dataset provides sentiment labels for financial news headlines/articles and should be formatted as follows:
+
+| date              | label_1 | label_2 | label_3 |
+| :---------------- | :-----: | :-----: | :-----: |
+| 2/3/2023 16:56    | 0       | 1       | 1       |
+| 2/3/2023 16:57    | 1       | 0       | 0       |
+| 2/3/2023 16:58    | -1      | 1       | 0       |
+| 2/3/2023 16:59    | 0       | 1       | 0       |
+
+- **date**: Timestamp of each news data point.  
+- **label_1, label_2, label_3**: Sentiment signals automatically generated by a Large Language Model (LLM).  
+  - `0`: Neutral sentiment.  
+  - `1`: News favorable to Currency B (or less favorable to Currency A).  
+  - `-1`: News favorable to Currency A (or less favorable to Currency B). 
+
+Multiple sentiment columns are provided so you can experiment with different labeling schemes. The trading code allows you to select which sentiment source to use with the `--sentiment_source` flag.  
+
+Example:
+```bash
+--sentiment_source label_2
+```
+
+## Installation
+To run this project, you need Python **3.11.8** and the dependencies listed in `requirements.txt`.  
+We recommend using [conda](https://docs.conda.io/en/latest/) to manage the environment.
+
+### 1. Create a Conda Environment
+```bash
+conda create -n ml_fx_trading_env python=3.11.8
+conda activate ml_fx_trading_env
+```
+
+### 2. Install Dependencies
+With the environment active, install all required libraries:
+```bash
+pip install -r requirements.txt
+```
 
 ## Example Usage
+Once the environment is set up and the datasets are prepared, you can train models, run trading strategies, and generate performance visualizations using the following command:
 ```bash
 python ml_fx_trading/run_trading_strategy.py \
     --model_name toto \
-    --data_path_train /path/to/train/data.csv \
-    --data_path_val /path/to/val/data.csv \
-    --data_path_test /path/to/test/data.csv \
+    --fx_data_path_train /path/to/fx/data/train.csv \
+    --fx_data_path_val /path/to/fx/data/val.csv \
+    --fx_data_path_test /path/to/fx/data/test.csv \
+    --news_data_path_train /path/to/news/data/train.csv \
+    --news_data_path_val /path/to/news/data/val.csv \
+    --news_data_path_test /path/to/news/data/test.csv \
     --n_epochs 1 \
-    --output_dir results \
+    --output_dir results/graphs \
     --use_frac_kelly
 ```
 
@@ -51,17 +99,20 @@ The full list of flags and options for the python script is as follows:
 ```
 --wallet_a: Amount of money in wallet A (currency A).
 --wallet_b: Amount of money in wallet B (currency B).
---model_name: Specify the model to use. Supported models include 'nbeats' for NBEATS, 'nhits' for NHiTS, 'tcn' for Temporal Convolutional Network, and 'toto' for Toto.
+--model_name: Specify the model to use. Supported models include 'nbeats' for NBEATS, 'nhits' for NHiTS, 'tcn' for Temporal Convolutional Network, 'toto' for Toto, and 'chronos' for Chronos-Bolt.
 --input_chunk_length: Length of the input sequences.
 --output_chunk_length: Length of the output sequences.
 --n_epochs: Number of training epochs.
 --batch_size: Batch size for training.
---data_path_train: Path to the training data.
---data_path_val: Path to the validation data.
---data_path_test: Path to the test data.
+--fx_data_path_train: Path to the fx training data. Currency rates should be provided as 1 A / 1 B, where A and B are the respective currencies.
+--fx_data_path_val: Path to the fx validation data. Currency rates should be provided as 1 A / 1 B, where A and B are the respective currencies.
+--fx_data_path_test: Path to the fx test data. Currency rates should be provided as 1 A / 1 B, where A and B are the respective currencies.
+--news_data_path_train: Path to the news training data.
+--news_data_path_val: Path to the news validation data.
+--news_data_path_test: Path to the news test data.
 --use_frac_kelly: Enable fractional kelly to size bets.
 --enable_transaction_costs: Enable transaction costs.
 --output_dir: Directory to save all outputs.
---news-min-hold-bars: Minimum number of bars to hold news_sentiment positions before allowing exit.
+---hold-minutes: umber of minutes to hold a position before allowing exit.
 --sentiment_source: Choose which sentiment label column to use for trading. Options: expert_llm_prompt_label, naive_prompt_label, competitor_label, naive_plus_prompt_converted_label.  
 ```
