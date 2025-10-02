@@ -161,7 +161,7 @@ def run_sl_based_trading_strategy(model_config):
         if (len(values['true_values']) < 7):
             continue
 
-        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.HOLD_MINUTES, True, model_config.ENABLE_TRANSACTION_COSTS)
+        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.NEWS_HOLD_MINUTES, True, model_config.ENABLE_TRANSACTION_COSTS, model_config.ALLOW_NEWS_OVERLAP)
         trading_strategy.simulate_trading_with_strategies(values['fx_timestamps'], values['true_values'], values['predicted_values'], values['bid_prices'], values['ask_prices'], values["news_timestamps"], values["news_sentiments"])
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
@@ -352,7 +352,7 @@ def run_sl_based_trading_strategy(model_config):
         if (len(values['true_values']) < 7):
             continue
 
-        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.HOLD_MINUTES, False, model_config.ENABLE_TRANSACTION_COSTS)
+        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.NEWS_HOLD_MINUTES, False, model_config.ENABLE_TRANSACTION_COSTS, model_config.ALLOW_NEWS_OVERLAP)
         trading_strategy.simulate_trading_with_strategies(values['fx_timestamps'], values['true_values'], values['predicted_values'], values['bid_prices'], values['ask_prices'], values["news_timestamps"], values["news_sentiments"])
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
@@ -517,7 +517,8 @@ def run(args):
     model_config.WALLET_B = args.wallet_b
     model_config.USE_FRAC_KELLY = args.use_frac_kelly
     model_config.ENABLE_TRANSACTION_COSTS = args.enable_transaction_costs
-    model_config.HOLD_MINUTES = args.hold_minutes
+    model_config.NEWS_HOLD_MINUTES = args.news_hold_minutes
+    model_config.ALLOW_NEWS_OVERLAP = args.allow_news_overlap
     model_config.SENTIMENT_SOURCE = args.sentiment_source
 
     root_dir = os.path.dirname(os.path.abspath(__file__))
@@ -548,7 +549,8 @@ def print_model_config(config):
     print(f"  Fractional Kelly Enabled  : {config.USE_FRAC_KELLY}")
     print(f"  Transaction Costs Enabled : {config.ENABLE_TRANSACTION_COSTS}")
     print(f"  Output Directory          : {config.OUTPUT_DIR}")
-    print(f"  Hold Minutes              : {config.HOLD_MINUTES}")
+    print(f"  News Hold Minutes         : {config.NEWS_HOLD_MINUTES}")
+    print(f"  Allow News Overlap        : {config.ALLOW_NEWS_OVERLAP}")
     print(f"  Sentiment Source          : {config.SENTIMENT_SOURCE}")
 
 if __name__ == "__main__":
@@ -583,10 +585,10 @@ if __name__ == "__main__":
     parser.add_argument("--enable_transaction_costs", action="store_true", help="Enable transaction costs. Default is False.")
     parser.add_argument("--output_dir", type=str, default="results/usd-cny-2023", help="Directory to save all outputs.")
     parser.add_argument(
-        "--hold-minutes",
+        "--news-hold-minutes",
         type=int,
         default=-1,
-        help="Number of minutes to hold a position before allowing exit.",
+        help="Number of minutes to hold a position before allowing exit for news sentiment strategy.",
     )
     parser.add_argument(
         "--sentiment_source",
@@ -600,6 +602,10 @@ if __name__ == "__main__":
         default="competitor_label",
         help="Choose which sentiment label column to use for trading."
     )
+    parser.add_argument(
+        "--allow_news_overlap", 
+        action="store_true", 
+        help="Enable overlapping news sentiment trades. When set, multiple news-driven positions may be open at the same time. Default: disabled.")
 
     args = parser.parse_args()
     

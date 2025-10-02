@@ -8,9 +8,13 @@ import os
 
 class TradingStrategy():
     """Trading Strategy for Supervised Learning based models, implementing different trading strategies using Kelly criterion for optimal bet sizing."""
-    def __init__(self, wallet_a, wallet_b, hold_minutes, use_kelly, enable_transaction_costs):
+    def __init__(self, wallet_a, wallet_b, news_hold_minutes, use_kelly, enable_transaction_costs, allow_news_overlap=False):
         self.use_kelly = use_kelly
         self.enable_transaction_costs = enable_transaction_costs
+        self.allow_news_overlap = allow_news_overlap
+        # Minimum number of minutes to hold a position before allowing exit for news sentiment strategy
+        self.news_hold_minutes = news_hold_minutes
+        self.no_hold = -1
         """Initialize the TradingStrategy class with the initial wallet balances and Kelly fraction option."""
         # Initialize wallets for different trading strategies
         self.wallet_a = {'mean_reversion': wallet_a, 'trend': wallet_a, 'pure_forcasting': wallet_a, 'hybrid_mean_reversion': wallet_a, 'hybrid_trend': wallet_a, 'news_sentiment': wallet_a, 'ensemble': wallet_a}
@@ -35,17 +39,18 @@ class TradingStrategy():
 
         # New: Track open positions
         self.open_positions = {
-            'mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': None},
-            'trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': None},
-            'pure_forcasting': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': None},
-            'hybrid_mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': None},
-            'hybrid_trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': None},
-            'news_sentiment': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': None},
-            'ensemble': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': None},
+            'mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
+            'trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
+            'pure_forcasting': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
+            'hybrid_mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
+            'hybrid_trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
+            'news_sentiment': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.news_hold_minutes},
+            'ensemble': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
         }
 
-        # Minimum number of minutes to hold a position before allowing exit for news sentiment strategy
-        self.hold_minutes = hold_minutes
+        self.open_positions_multi = {
+            'news_sentiment': []  # list of per-trade dicts (same shape as a single slot)
+        }
 
         self.min_trades_for_full_kelly = 30  # Minimum trades before using full Kelly
         self.fixed_position_size = 10000  # Fixed position size for training
@@ -72,6 +77,15 @@ class TradingStrategy():
             'buy_currency_a': 1,
             'sell_currency_a': 2
         }
+
+    def _get_prices(self, bid_price, ask_price):
+        if self.enable_transaction_costs:
+            buy_price = ask_price
+            sell_price = bid_price
+        else:
+            mid = (bid_price + ask_price) / 2
+            buy_price = sell_price = mid
+        return buy_price, sell_price
     
     def win_loss_ratio(self, strategy_name):
         """Calculate the win/loss ratio for a strategy with basic smoothing."""
@@ -114,76 +128,104 @@ class TradingStrategy():
     def execute_trade(self, strategy_name, fx_timestamp, trade_direction, bid_price, ask_price):
         """Calculate profit/loss and handle position management"""
         # Determine pricing based on transaction costs setting
-        if self.enable_transaction_costs:
-            buy_price = ask_price
-            sell_price = bid_price
-        else:
-            mid_price = (bid_price + ask_price) / 2
-            buy_price = sell_price = mid_price
+        buy_price, sell_price = self._get_prices(bid_price, ask_price)
+
+        # -------- NEWS (overlap path) --------
+        if strategy_name == 'news_sentiment' and self.allow_news_overlap:
+            # 1) close any expired news positions first
+            still_open = []
+            for pos in self.open_positions_multi[strategy_name]:
+                if pos['hold_minutes'] == self.no_hold or (fx_timestamp - pos['entry_timestamp']) >= datetime.timedelta(minutes=pos['hold_minutes']):
+                    self._close_single_position(strategy_name, pos, sell_price, buy_price)
+                else:
+                    still_open.append(pos)
+            self.open_positions_multi[strategy_name] = still_open
+            self._open_single_position(strategy_name, fx_timestamp, trade_direction, buy_price, sell_price)
+            return
         
+        # -------- DEFAULT (single-slot) for all other strategies (and news when overlap disabled) --------
         position = self.open_positions[strategy_name]
 
         # Check if there's an open position
         if position['type'] is not None:
-            if self.hold_minutes == -1 or (fx_timestamp - position['entry_timestamp']) >= datetime.timedelta(minutes=position['hold_minutes']):
+            if position['hold_minutes'] == self.no_hold or (fx_timestamp - position['entry_timestamp']) >= datetime.timedelta(minutes=position['hold_minutes']):
                 # Close the position
                 self.close_position(strategy_name, sell_price, buy_price)
             else:
                 return
-        
-        # Then open new position if there's a trade signal and no matching position type
-        if trade_direction != 'no_trade':
-            # Calculate total portfolio value in currency A
-            total_value_in_a = self.wallet_a[strategy_name] + (self.wallet_b[strategy_name] / buy_price)
 
-            if(self.use_kelly):
-                f_i = self.kelly_criterion(strategy_name)
-                base_bet_size_a = f_i * total_value_in_a
-            else:
-                base_bet_size_a = self.fixed_position_size
-            
-            if trade_direction == 'buy_currency_a':
-                bet_size_a = min(base_bet_size_a, self.wallet_b[strategy_name] / buy_price)
-                bet_size_b = bet_size_a * buy_price
-                
-                # Check if we have enough B
-                if bet_size_b <= self.wallet_b[strategy_name]:
-                    self.wallet_a[strategy_name] += bet_size_a
-                    self.wallet_b[strategy_name] -= bet_size_b
-                    
-                    self.open_positions[strategy_name] = {
-                        'type': 'long',
-                        'size_a': bet_size_a,
-                        'size_b': bet_size_b,
-                        'entry_ratio': buy_price,
-                        'entry_timestamp': fx_timestamp,
-                        'hold_minutes': self.hold_minutes,
-                    }
-                else:
-                    print(f"Not enough B to buy {bet_size_a} currency A")
+        self._open_single_position(strategy_name, fx_timestamp, trade_direction, buy_price, sell_price)
 
-            elif trade_direction == 'sell_currency_a':
-                bet_size_a = min(base_bet_size_a, self.wallet_a[strategy_name])
-                bet_size_b = bet_size_a * sell_price
-                
-                if bet_size_a <= self.wallet_a[strategy_name]:
-                    self.wallet_a[strategy_name] -= bet_size_a
-                    self.wallet_b[strategy_name] += bet_size_b
-                    
-                    self.open_positions[strategy_name] = {
-                        'type': 'short',
-                        'size_a': bet_size_a,
-                        'size_b': bet_size_b,
-                        'entry_ratio': sell_price,
-                        'entry_timestamp': fx_timestamp,
-                        'hold_minutes': self.hold_minutes,
-                    }
-                else:
-                    print(f"Not enough A to sell {bet_size_a} currency A")
-    
-    def close_position(self, strategy_name, sell_price, buy_price):
+    def _open_single_position(self, strategy_name, fx_timestamp, trade_direction, buy_price, sell_price):
+        """Open a single-slot position for a strategy (updates wallets and self.open_positions)."""
+        if trade_direction == 'no_trade':
+            return
+
+        # 1) Total portfolio value in currency A
+        total_value_in_a = self.wallet_a[strategy_name] + (self.wallet_b[strategy_name] / buy_price)
+
+        # 2) Position sizing (Kelly or fixed)
+        if self.use_kelly:
+            f_i = self.kelly_criterion(strategy_name)
+            base_bet_size_a = f_i * total_value_in_a
+        else:
+            base_bet_size_a = self.fixed_position_size
+
+        # 3) Direction-specific bet sizes and balance checks
+        if trade_direction == 'buy_currency_a':  # LONG
+            bet_size_a = min(base_bet_size_a, self.wallet_b[strategy_name] / buy_price)
+            bet_size_b = bet_size_a * buy_price
+
+            if bet_size_b > self.wallet_b[strategy_name] or bet_size_a <= 0:
+                print(f"Not enough B to buy {bet_size_a:.4f} currency A")
+                return
+
+            # Update wallets
+            self.wallet_a[strategy_name] += bet_size_a
+            self.wallet_b[strategy_name] -= bet_size_b
+
+            pos_type = 'long'
+            entry_ratio = buy_price
+
+        elif trade_direction == 'sell_currency_a':  # SHORT
+            bet_size_a = min(base_bet_size_a, self.wallet_a[strategy_name])
+            bet_size_b = bet_size_a * sell_price
+
+            if bet_size_a > self.wallet_a[strategy_name] or bet_size_a <= 0:
+                print(f"Not enough A to sell {bet_size_a:.4f} currency A")
+                return
+
+            # Update wallets
+            self.wallet_a[strategy_name] -= bet_size_a
+            self.wallet_b[strategy_name] += bet_size_b
+
+            pos_type = 'short'
+            entry_ratio = sell_price
+
+        # 4) Record open position (single-slot store)
+        hold_mins = (self.news_hold_minutes if strategy_name == 'news_sentiment' else self.no_hold)
+
+        if strategy_name == 'news_sentiment' and self.allow_news_overlap:
+            self.open_positions_multi[strategy_name].append({
+                'type': pos_type,
+                'size_a': bet_size_a,
+                'size_b': bet_size_b,
+                'entry_ratio': entry_ratio,
+                'entry_timestamp': fx_timestamp,
+                'hold_minutes': hold_mins,
+            })
+        else:
+            self.open_positions[strategy_name] = {
+                'type': pos_type,
+                'size_a': bet_size_a,
+                'size_b': bet_size_b,
+                'entry_ratio': entry_ratio,
+                'entry_timestamp': fx_timestamp,
+                'hold_minutes': hold_mins,
+            }
+
+    def _close_single_position(self, strategy_name, position, sell_price, buy_price):
         """Close an open position and calculate profit/loss"""
-        position = self.open_positions[strategy_name]
         profit_in_curr_b = 0.0
         
         if position['type'] == 'long':
@@ -214,9 +256,6 @@ class TradingStrategy():
             self.wallet_b[strategy_name] -= cost_to_buyback_a
             self.wallet_a[strategy_name] += position['size_a']
         
-        # Reset position tracking
-        self.open_positions[strategy_name] = {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': None}
-
         # Update profit tracking
         self.num_trades[strategy_name] += 1
         self.total_profit_or_loss[strategy_name] += profit_in_curr_a
@@ -228,6 +267,14 @@ class TradingStrategy():
         elif profit_in_curr_a < 0:
             self.num_losses[strategy_name] += 1
             self.total_losses[strategy_name] += abs(profit_in_curr_a)
+
+    def close_position(self, strategy_name, sell_price, buy_price):
+        position = self.open_positions[strategy_name]
+        if position['type'] is None:
+            return
+        self._close_single_position(strategy_name, position, sell_price, buy_price)
+        self.open_positions[strategy_name] = {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None,
+                                            'hold_minutes': self.news_hold_minutes if strategy_name == 'news_sentiment' else self.no_hold}
     
     def determine_trade_direction(self, strategy_name, base_pct_change, pred_pct_change):
         """Determine the trade direction based on strategy and ratio changes."""
@@ -431,18 +478,24 @@ class TradingStrategy():
             self.execute_trade(strategy_name, curr_fx_timestamp, trade_direction, curr_bid_price, curr_ask_price)
 
     def _maybe_close_position(self, strategy_name, fx_timestamp, bid_price, ask_price):
-        if self.enable_transaction_costs:
-            buy_price = ask_price
-            sell_price = bid_price
-        else:
-            mid_price = (bid_price + ask_price) / 2
-            buy_price = sell_price = mid_price
+        buy_price, sell_price = self._get_prices(bid_price, ask_price)
+
+        if strategy_name == 'news_sentiment' and self.allow_news_overlap:
+            # close any expired stacked positions
+            still_open = []
+            for pos in self.open_positions_multi['news_sentiment']:
+                if pos['hold_minutes'] == self.no_hold or (fx_timestamp - pos['entry_timestamp']) >= datetime.timedelta(minutes=pos['hold_minutes']):
+                    self._close_single_position('news_sentiment', pos, sell_price, buy_price)
+                else:
+                    still_open.append(pos)
+            self.open_positions_multi['news_sentiment'] = still_open
+            return
         
         position = self.open_positions[strategy_name]
 
         # Check if there's an open position
         if position['type'] is not None:
-            if self.hold_minutes == -1 or (fx_timestamp - position['entry_timestamp']) >= datetime.timedelta(minutes=position['hold_minutes']):
+            if position['hold_minutes'] == self.no_hold or (fx_timestamp - position['entry_timestamp']) >= datetime.timedelta(minutes=position['hold_minutes']):
                 # Close the position
                 self.close_position(strategy_name, sell_price, buy_price)
 
@@ -472,20 +525,20 @@ class TradingStrategy():
 
                 j += 1
         
-    def _close_all_remaining_positions(self, strategy_names, bid_prices, ask_prices):
+    def _close_all_remaining_positions(self, strategy_names, bid_price, ask_price):
         """Helper method to close any remaining open positions for all strategies."""
+        buy_price, sell_price = self._get_prices(bid_price, ask_price)
+
         for strategy_name in strategy_names:
-            position = self.open_positions[strategy_name]
-            if position['type'] is not None:
-                sell_price = bid_prices[-1]
-                buy_price = ask_prices[-1]
-                
-                if not self.enable_transaction_costs:
-                    mid_price = (sell_price + buy_price) / 2
-                    buy_price = sell_price = mid_price
-                    
-                # Close the position
-                self.close_position(strategy_name, sell_price, buy_price)
+            if strategy_name == 'news_sentiment' and self.allow_news_overlap:
+                # close every stacked position
+                for pos in list(self.open_positions_multi['news_sentiment']):
+                    self._close_single_position('news_sentiment', pos, sell_price, buy_price)
+                self.open_positions_multi['news_sentiment'].clear()
+            else:
+                position = self.open_positions[strategy_name]
+                if position['type'] is not None:
+                    self.close_position(strategy_name, sell_price, buy_price)
 
     def simulate_trading_with_strategies(self, fx_timestamps, actual_rates, pred_rates, bid_prices, ask_prices, news_timestamps, news_sentiments):
         """Simulate trading over a series of exchange rates using different strategies."""
@@ -565,7 +618,7 @@ class TradingStrategy():
         all_strategy_names = base_strategy_names + ['ensemble']
         if news_enabled:
             all_strategy_names.append('news_sentiment')
-        self._close_all_remaining_positions(all_strategy_names, bid_prices_test, ask_prices_test)
+        self._close_all_remaining_positions(all_strategy_names, bid_prices_test[-1], ask_prices_test[-1])
 
         # Calculate Sharpe ratios for selected strategies
         for strategy_name in all_strategy_names:
