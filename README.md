@@ -113,6 +113,7 @@ The full list of flags and options for the python script is as follows:
 --use_frac_kelly: Enable fractional kelly to size bets.
 --enable_transaction_costs: Enable transaction costs.
 --output_dir: Directory to save all outputs.
----hold-minutes: umber of minutes to hold a position before allowing exit.
---sentiment_source: Choose which sentiment label column to use for trading. Options: expert_llm_prompt_label, naive_prompt_label, competitor_label, naive_plus_prompt_converted_label.  
+--news-hold-minutes: Number of minutes to hold a position before allowing exit for news sentiment strategy.
+--sentiment_source: Choose which sentiment label column to use for trading. Options: expert_llm_prompt_label, naive_prompt_label, competitor_label, naive_plus_prompt_converted_label.
+--allow_news_overlap: Enable overlapping news sentiment trades. When set, multiple news-driven positions may be open at the same time.
 ```

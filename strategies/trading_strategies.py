@@ -38,7 +38,7 @@ class TradingStrategy():
         self.sharpe_ratios = {'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0, 'news_sentiment': 0, 'ensemble': 0}
 
         # New: Track open positions
-        self.open_positions = {
+        self.single_slot_positions = {
             'mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
             'trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
             'pure_forcasting': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
@@ -48,7 +48,7 @@ class TradingStrategy():
             'ensemble': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
         }
 
-        self.open_positions_multi = {
+        self.multi_slot_positions = {
             'news_sentiment': []  # list of per-trade dicts (same shape as a single slot)
         }
 
@@ -134,17 +134,17 @@ class TradingStrategy():
         if strategy_name == 'news_sentiment' and self.allow_news_overlap:
             # 1) close any expired news positions first
             still_open = []
-            for pos in self.open_positions_multi[strategy_name]:
+            for pos in self.multi_slot_positions[strategy_name]:
                 if pos['hold_minutes'] == self.no_hold or (fx_timestamp - pos['entry_timestamp']) >= datetime.timedelta(minutes=pos['hold_minutes']):
                     self._close_single_position(strategy_name, pos, sell_price, buy_price)
                 else:
                     still_open.append(pos)
-            self.open_positions_multi[strategy_name] = still_open
+            self.multi_slot_positions[strategy_name] = still_open
             self._open_single_position(strategy_name, fx_timestamp, trade_direction, buy_price, sell_price)
             return
         
         # -------- DEFAULT (single-slot) for all other strategies (and news when overlap disabled) --------
-        position = self.open_positions[strategy_name]
+        position = self.single_slot_positions[strategy_name]
 
         # Check if there's an open position
         if position['type'] is not None:
@@ -157,7 +157,7 @@ class TradingStrategy():
         self._open_single_position(strategy_name, fx_timestamp, trade_direction, buy_price, sell_price)
 
     def _open_single_position(self, strategy_name, fx_timestamp, trade_direction, buy_price, sell_price):
-        """Open a single-slot position for a strategy (updates wallets and self.open_positions)."""
+        """Open a single-slot position for a strategy."""
         if trade_direction == 'no_trade':
             return
 
@@ -206,7 +206,7 @@ class TradingStrategy():
         hold_mins = (self.news_hold_minutes if strategy_name == 'news_sentiment' else self.no_hold)
 
         if strategy_name == 'news_sentiment' and self.allow_news_overlap:
-            self.open_positions_multi[strategy_name].append({
+            self.multi_slot_positions[strategy_name].append({
                 'type': pos_type,
                 'size_a': bet_size_a,
                 'size_b': bet_size_b,
@@ -215,7 +215,7 @@ class TradingStrategy():
                 'hold_minutes': hold_mins,
             })
         else:
-            self.open_positions[strategy_name] = {
+            self.single_slot_positions[strategy_name] = {
                 'type': pos_type,
                 'size_a': bet_size_a,
                 'size_b': bet_size_b,
@@ -269,11 +269,11 @@ class TradingStrategy():
             self.total_losses[strategy_name] += abs(profit_in_curr_a)
 
     def close_position(self, strategy_name, sell_price, buy_price):
-        position = self.open_positions[strategy_name]
+        position = self.single_slot_positions[strategy_name]
         if position['type'] is None:
             return
         self._close_single_position(strategy_name, position, sell_price, buy_price)
-        self.open_positions[strategy_name] = {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None,
+        self.single_slot_positions[strategy_name] = {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None,
                                             'hold_minutes': self.news_hold_minutes if strategy_name == 'news_sentiment' else self.no_hold}
     
     def determine_trade_direction(self, strategy_name, base_pct_change, pred_pct_change):
@@ -483,15 +483,15 @@ class TradingStrategy():
         if strategy_name == 'news_sentiment' and self.allow_news_overlap:
             # close any expired stacked positions
             still_open = []
-            for pos in self.open_positions_multi['news_sentiment']:
+            for pos in self.multi_slot_positions['news_sentiment']:
                 if pos['hold_minutes'] == self.no_hold or (fx_timestamp - pos['entry_timestamp']) >= datetime.timedelta(minutes=pos['hold_minutes']):
                     self._close_single_position('news_sentiment', pos, sell_price, buy_price)
                 else:
                     still_open.append(pos)
-            self.open_positions_multi['news_sentiment'] = still_open
+            self.multi_slot_positions['news_sentiment'] = still_open
             return
         
-        position = self.open_positions[strategy_name]
+        position = self.single_slot_positions[strategy_name]
 
         # Check if there's an open position
         if position['type'] is not None:
@@ -532,11 +532,11 @@ class TradingStrategy():
         for strategy_name in strategy_names:
             if strategy_name == 'news_sentiment' and self.allow_news_overlap:
                 # close every stacked position
-                for pos in list(self.open_positions_multi['news_sentiment']):
+                for pos in list(self.multi_slot_positions['news_sentiment']):
                     self._close_single_position('news_sentiment', pos, sell_price, buy_price)
-                self.open_positions_multi['news_sentiment'].clear()
+                self.multi_slot_positions['news_sentiment'].clear()
             else:
-                position = self.open_positions[strategy_name]
+                position = self.single_slot_positions[strategy_name]
                 if position['type'] is not None:
                     self.close_position(strategy_name, sell_price, buy_price)
 
