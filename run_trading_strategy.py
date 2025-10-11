@@ -11,7 +11,6 @@ import argparse
 import os
 from strategies import TradingStrategy
 from collections import defaultdict
-from datetime import datetime
 import matplotlib.pyplot as plt
 import torch
 import random
