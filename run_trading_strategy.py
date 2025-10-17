@@ -129,7 +129,7 @@ def run_sl_based_trading_strategy(model_config):
     print("\n")
     mean_reversion_profit = []
     trend_profit = []
-    forecasting_profit = []
+    model_based_profit = []
     hybrid_mean_reversion_profit = []
     hybrid_trend_profit = []
     news_sentiment_profit = []
@@ -137,7 +137,7 @@ def run_sl_based_trading_strategy(model_config):
 
     mean_reversion_num_trades = []
     trend_num_trades = []
-    forecasting_num_trades = []
+    model_based_num_trades = []
     hybrid_mean_reversion_num_trades = []
     hybrid_trend_num_trades = []
     news_sentiment_num_trades = []
@@ -151,7 +151,7 @@ def run_sl_based_trading_strategy(model_config):
         trading_strategy.simulate_trading_with_strategies(values['fx_timestamps'], values['true_values'], values['predicted_values'], values['bid_prices'], values['ask_prices'], values["news_timestamps"], values["news_sentiments"])
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
-        forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])
+        model_based_profit.append(trading_strategy.total_profit_or_loss["model_based"])
         hybrid_mean_reversion_profit.append(trading_strategy.total_profit_or_loss["hybrid_mean_reversion"])
         hybrid_trend_profit.append(trading_strategy.total_profit_or_loss["hybrid_trend"])
         news_sentiment_profit.append(trading_strategy.total_profit_or_loss["news_sentiment"])
@@ -159,7 +159,7 @@ def run_sl_based_trading_strategy(model_config):
 
         mean_reversion_num_trades.append(trading_strategy.num_trades["mean_reversion"])
         trend_num_trades.append(trading_strategy.num_trades["trend"])
-        forecasting_num_trades.append(trading_strategy.num_trades["pure_forcasting"])
+        model_based_num_trades.append(trading_strategy.num_trades["model_based"])
         hybrid_mean_reversion_num_trades.append(trading_strategy.num_trades["hybrid_mean_reversion"])
         hybrid_trend_num_trades.append(trading_strategy.num_trades["hybrid_trend"])
         news_sentiment_num_trades.append(trading_strategy.num_trades["news_sentiment"])
@@ -167,7 +167,7 @@ def run_sl_based_trading_strategy(model_config):
 
     cumulative_mean_reversion_profit = np.cumsum(mean_reversion_profit)
     cumulative_trend_profit = np.cumsum(trend_profit)
-    cumulative_forecasting_profit = np.cumsum(forecasting_profit)
+    cumulative_model_based_profit = np.cumsum(model_based_profit)
     cumulative_hybrid_mean_reversion_profit = np.cumsum(hybrid_mean_reversion_profit)
     cumulative_hybrid_trend_profit = np.cumsum(hybrid_trend_profit)
     # cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
@@ -175,7 +175,7 @@ def run_sl_based_trading_strategy(model_config):
 
     plt.plot(cumulative_mean_reversion_profit, color='purple', label='Mean Reversion Strategy')
     plt.plot(cumulative_trend_profit, color='blue', label='Trend Strategy')
-    plt.plot(cumulative_forecasting_profit, color='red', label=f'Model-Based Strategy')
+    plt.plot(cumulative_model_based_profit, color='red', label=f'Model-Based Strategy')
     plt.plot(cumulative_hybrid_mean_reversion_profit, color='green', label='Hybrid Mean Reversion Strategy')
     plt.plot(cumulative_hybrid_trend_profit, color='brown', label='Hybrid Trend Strategy')
     # plt.plot(cumulative_news_sentiment_profit, color='pink', label='News Sentiment Strategy')
@@ -197,7 +197,7 @@ def run_sl_based_trading_strategy(model_config):
     print("\n")
     mean_reversion_profit = []
     trend_profit = []
-    forecasting_profit = []
+    model_based_profit = []
     hybrid_mean_reversion_profit = []
     hybrid_trend_profit = []
     news_sentiment_profit = []
@@ -205,7 +205,7 @@ def run_sl_based_trading_strategy(model_config):
 
     mean_reversion_num_trades = []
     trend_num_trades = []
-    forecasting_num_trades = []
+    model_based_num_trades = []
     hybrid_mean_reversion_num_trades = []
     hybrid_trend_num_trades = []
     news_sentiment_num_trades = []
@@ -219,7 +219,7 @@ def run_sl_based_trading_strategy(model_config):
         trading_strategy.simulate_trading_with_strategies(values['fx_timestamps'], values['true_values'], values['predicted_values'], values['bid_prices'], values['ask_prices'], values["news_timestamps"], values["news_sentiments"])
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
-        forecasting_profit.append(trading_strategy.total_profit_or_loss["pure_forcasting"])
+        model_based_profit.append(trading_strategy.total_profit_or_loss["model_based"])
         hybrid_mean_reversion_profit.append(trading_strategy.total_profit_or_loss["hybrid_mean_reversion"])
         hybrid_trend_profit.append(trading_strategy.total_profit_or_loss["hybrid_trend"])
         news_sentiment_profit.append(trading_strategy.total_profit_or_loss["news_sentiment"])
@@ -227,7 +227,7 @@ def run_sl_based_trading_strategy(model_config):
 
         mean_reversion_num_trades.append(trading_strategy.num_trades["mean_reversion"])
         trend_num_trades.append(trading_strategy.num_trades["trend"])
-        forecasting_num_trades.append(trading_strategy.num_trades["pure_forcasting"])
+        model_based_num_trades.append(trading_strategy.num_trades["model_based"])
         hybrid_mean_reversion_num_trades.append(trading_strategy.num_trades["hybrid_mean_reversion"])
         hybrid_trend_num_trades.append(trading_strategy.num_trades["hybrid_trend"])
         news_sentiment_num_trades.append(trading_strategy.num_trades["news_sentiment"])
@@ -235,7 +235,7 @@ def run_sl_based_trading_strategy(model_config):
 
     cumulative_mean_reversion_profit = np.cumsum(mean_reversion_profit)
     cumulative_trend_profit = np.cumsum(trend_profit)
-    cumulative_forecasting_profit = np.cumsum(forecasting_profit)
+    cumulative_model_based_profit = np.cumsum(model_based_profit)
     cumulative_hybrid_mean_reversion_profit = np.cumsum(hybrid_mean_reversion_profit)
     cumulative_hybrid_trend_profit = np.cumsum(hybrid_trend_profit)
     # cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
@@ -244,7 +244,7 @@ def run_sl_based_trading_strategy(model_config):
 
     plt.plot(cumulative_mean_reversion_profit, color='purple', label='Mean Reversion Strategy')
     plt.plot(cumulative_trend_profit, color='blue', label='Trend Strategy')
-    plt.plot(cumulative_forecasting_profit, color='red', label=f'Model-Based Strategy')
+    plt.plot(cumulative_model_based_profit, color='red', label=f'Model-Based Strategy')
     plt.plot(cumulative_hybrid_mean_reversion_profit, color='green', label='Hybrid Mean Reversion Strategy')
     plt.plot(cumulative_hybrid_trend_profit, color='brown', label='Hybrid Trend Strategy')
     # plt.plot(cumulative_news_sentiment_profit, color='pink', label='News Sentiment Strategy')
