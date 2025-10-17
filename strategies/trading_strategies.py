@@ -3,8 +3,6 @@ from xgboost import XGBClassifier
 from utils import TradingUtils
 from collections import Counter
 import datetime
-import csv
-import os
 
 class TradingStrategy():
     """Trading Strategy for Supervised Learning based models, implementing different trading strategies using Kelly criterion for optimal bet sizing."""
@@ -35,7 +33,6 @@ class TradingStrategy():
             'news_sentiment': [],
             'ensemble': []
         }
-        self.sharpe_ratios = {'mean_reversion': 0, 'trend': 0, 'pure_forcasting': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0, 'news_sentiment': 0, 'ensemble': 0}
 
         # New: Track open positions
         self.single_slot_positions = {
@@ -619,10 +616,6 @@ class TradingStrategy():
         if news_enabled:
             all_strategy_names.append('news_sentiment')
         self._close_all_remaining_positions(all_strategy_names, bid_prices_test[-1], ask_prices_test[-1])
-
-        # Calculate Sharpe ratios for selected strategies
-        for strategy_name in all_strategy_names:
-            self.sharpe_ratios[strategy_name] = TradingUtils.calculate_sharpe_ratio(self.trade_returns[strategy_name])
 
         # Display results
         print("=== Trading Simulation Results ===")

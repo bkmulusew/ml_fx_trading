@@ -2,7 +2,7 @@ from models import FinancialForecastingModel
 import pandas as pd
 from darts import TimeSeries
 from darts.dataprocessing.transformers import Scaler
-from darts.models import NHiTSModel, NBEATSModel, TCNModel, TransformerModel
+from darts.models import NHiTSModel, NBEATSModel, TCNModel
 
 class DartsFinancialForecastingModel(FinancialForecastingModel):
     """A financial forecasting model based on the Darts library."""
@@ -122,9 +122,12 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
             self.scaler.transform(test_series)
         )
 
-    def train(self, train_series, validation_series):
+    def train(self, train_series, validation_series=None):
         """Trains the model."""
-        self.model.fit(train_series, val_series=validation_series, verbose=True)
+        if validation_series is not None:
+            self.model.fit(train_series, val_series=validation_series, verbose=True)
+        else:
+            self.model.fit(train_series, verbose=True)
 
     def predict_future_values(self, test_series):
         """Makes future value predictions based on the test series."""
