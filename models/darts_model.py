@@ -25,7 +25,7 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
                 layer_widths=512,
                 dropout=0.2,
                 n_epochs=self.model_config.N_EPOCHS,
-                batch_size=self.model_config.BATCH_SIZE,
+                batch_size=self.model_config.TRAIN_BATCH_SIZE,
                 model_name="nbeats",
                 optimizer_kwargs={"lr": 0.0001},
                 pl_trainer_kwargs={
@@ -43,7 +43,7 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
                 layer_widths=512,
                 dropout=0.2,
                 n_epochs=self.model_config.N_EPOCHS,
-                batch_size=self.model_config.BATCH_SIZE,
+                batch_size=self.model_config.TRAIN_BATCH_SIZE,
                 model_name="nhits",
                 optimizer_kwargs={"lr": 0.0001},
                 pl_trainer_kwargs={
@@ -60,7 +60,7 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
                 num_layers = 8,
                 dilation_base = 2,
                 n_epochs=self.model_config.N_EPOCHS,
-                batch_size=self.model_config.BATCH_SIZE,
+                batch_size=self.model_config.TRAIN_BATCH_SIZE,
                 weight_norm = True,
                 model_name="tcn",
                 dropout = 0.2,

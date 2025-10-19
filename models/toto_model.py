@@ -6,7 +6,7 @@ from models.toto.toto.data.util.dataset import MaskedTimeseries
 from models.toto.toto.inference.forecaster import TotoForecaster
 from models.toto.toto.model.toto import Toto
 
-NUM_SAMPLES: int = 8
+NUM_SAMPLES: int = 64
 TIME_INTERVAL_SECONDS: float = 60.0
 
 class TotoFinancialForecastingModel(FinancialForecastingModel):
@@ -96,7 +96,7 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
     def predict_future_values(self, input_sequences):
         """Make prediction for a batch of input sequences"""
 
-        # input_sequences shape: (BATCH_SIZE, INPUT_CHUNK_LENGTH, 1)
+        # input_sequences shape: (EVAL_BATCH_SIZE, INPUT_CHUNK_LENGTH, 1)
         batch_size, _, num_features = input_sequences.shape
 
         # Toto expects (batch, variates, time_steps)
@@ -152,14 +152,14 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
         # Allocate storage for predictions
         all_predictions = np.empty(num_predictions, dtype=np.float32)
 
-        for batch_idx in range(0, num_predictions, self.model_config.BATCH_SIZE):
+        for batch_idx in range(0, num_predictions, self.model_config.EVAL_BATCH_SIZE):
             # Calculate batch boundaries
             batch_start = batch_idx
-            batch_end = min(batch_idx + self.model_config.BATCH_SIZE, num_predictions)
+            batch_end = min(batch_idx + self.model_config.EVAL_BATCH_SIZE, num_predictions)
 
             # Create batch of input sequences
             indices = np.arange(batch_start, batch_end)[:, None] + np.arange(self.model_config.INPUT_CHUNK_LENGTH)
-            batch_input = data[indices]  # Shape: (actual_batch_size, INPUT_CHUNK_LENGTH, 1)
+            batch_input = data[indices]  # Shape: (EVAL_BATCH_SIZE, INPUT_CHUNK_LENGTH, 1)
             
             predictions = self.predict_future_values(batch_input)
             all_predictions[batch_start:batch_end] = predictions

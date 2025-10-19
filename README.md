@@ -103,7 +103,8 @@ The full list of flags and options for the python script is as follows:
 --input_chunk_length: Length of the input sequences.
 --output_chunk_length: Length of the output sequences.
 --n_epochs: Number of training epochs.
---batch_size: Batch size for training.
+--train_batch_size: Batch size for training.
+--eval_batch_size: Batch size for evaluation.
 --fx_data_path_train: Path to the fx training data. Currency rates should be provided as 1 A / 1 B, where A and B are the respective currencies.
 --fx_data_path_val: Path to the fx validation data. Currency rates should be provided as 1 A / 1 B, where A and B are the respective currencies.
 --fx_data_path_test: Path to the fx test data. Currency rates should be provided as 1 A / 1 B, where A and B are the respective currencies.

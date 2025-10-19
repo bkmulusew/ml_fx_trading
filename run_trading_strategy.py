@@ -241,7 +241,6 @@ def run_sl_based_trading_strategy(model_config):
     # cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
     cumulative_ensemble_profit = np.cumsum(ensemble_profit)
 
-
     plt.plot(cumulative_mean_reversion_profit, color='purple', label='Mean Reversion Strategy')
     plt.plot(cumulative_trend_profit, color='blue', label='Trend Strategy')
     plt.plot(cumulative_model_based_profit, color='red', label=f'Model-Based Strategy')
@@ -263,7 +262,8 @@ def run(args):
     model_config.INPUT_CHUNK_LENGTH = args.input_chunk_length
     model_config.OUTPUT_CHUNK_LENGTH = args.output_chunk_length
     model_config.N_EPOCHS = args.n_epochs
-    model_config.BATCH_SIZE = args.batch_size
+    model_config.TRAIN_BATCH_SIZE = args.train_batch_size
+    model_config.EVAL_BATCH_SIZE = args.eval_batch_size
     model_config.FX_DATA_PATH_TRAIN = args.fx_data_path_train
     model_config.FX_DATA_PATH_VAL = args.fx_data_path_val
     model_config.FX_DATA_PATH_TEST = args.fx_data_path_test
@@ -295,7 +295,8 @@ def print_model_config(config):
     print(f"  Input Chunk Length        : {config.INPUT_CHUNK_LENGTH}")
     print(f"  Output Chunk Length       : {config.OUTPUT_CHUNK_LENGTH}")
     print(f"  Number of Epochs          : {config.N_EPOCHS}")
-    print(f"  Batch Size                : {config.BATCH_SIZE}")
+    print(f"  Train Batch Size          : {config.TRAIN_BATCH_SIZE}")
+    print(f"  Eval Batch Size           : {config.EVAL_BATCH_SIZE}")
     print(f"  FX Data Path Train        : {config.FX_DATA_PATH_TRAIN}")
     print(f"  FX Data Path Val          : {config.FX_DATA_PATH_VAL}")
     print(f"  FX Data Path Test         : {config.FX_DATA_PATH_TEST}")
@@ -334,7 +335,8 @@ if __name__ == "__main__":
     parser.add_argument("--input_chunk_length", type=int, default=64, help="Length of the input sequences.")
     parser.add_argument("--output_chunk_length", type=int, default=1, help="Length of the output sequences.")
     parser.add_argument("--n_epochs", type=int, default=50, help="Number of training epochs.")
-    parser.add_argument("--batch_size", type=int, default=1024, help="Batch size for training.")
+    parser.add_argument("--train_batch_size", type=int, default=1024, help="Batch size for training.")
+    parser.add_argument("--eval_batch_size", type=int, default=128, help="Batch size for evaluation.")
     parser.add_argument(
         "--fx_data_path_train",
         type=str,
