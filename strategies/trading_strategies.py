@@ -15,21 +15,19 @@ class TradingStrategy():
         self.no_hold = -1
         """Initialize the TradingStrategy class with the initial wallet balances and Kelly fraction option."""
         # Initialize wallets for different trading strategies
-        self.wallet_a = {'mean_reversion': wallet_a, 'trend': wallet_a, 'model_based': wallet_a, 'hybrid_mean_reversion': wallet_a, 'hybrid_trend': wallet_a, 'news_sentiment': wallet_a, 'ensemble': wallet_a}
-        self.wallet_b = {'mean_reversion': wallet_b, 'trend': wallet_b, 'model_based': wallet_b, 'hybrid_mean_reversion': wallet_b, 'hybrid_trend': wallet_b, 'news_sentiment': wallet_b, 'ensemble': wallet_b}
+        self.wallet_a = {'mean_reversion': wallet_a, 'trend': wallet_a, 'forecast_based': wallet_a, 'news_sentiment': wallet_a, 'ensemble': wallet_a}
+        self.wallet_b = {'mean_reversion': wallet_b, 'trend': wallet_b, 'forecast_based': wallet_b, 'news_sentiment': wallet_b, 'ensemble': wallet_b}
         # Track profit/loss, wins/losses, and total gains/losses for each strategy
-        self.total_profit_or_loss = {'mean_reversion': 0, 'trend': 0, 'model_based': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.num_trades = {'mean_reversion': 1, 'trend': 1, 'model_based': 1, 'hybrid_mean_reversion': 1, 'hybrid_trend': 1, 'news_sentiment': 1, 'ensemble': 1}
-        self.num_wins = {'mean_reversion': 0, 'trend': 0, 'model_based': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.num_losses = {'mean_reversion': 0, 'trend': 0, 'model_based': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.total_gains = {'mean_reversion': 0, 'trend': 0, 'model_based': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.total_losses = {'mean_reversion': 0, 'trend': 0, 'model_based': 0, 'hybrid_mean_reversion': 0, 'hybrid_trend': 0, 'news_sentiment': 0, 'ensemble': 0}
+        self.total_profit_or_loss = {'mean_reversion': 0, 'trend': 0, 'forecast_based': 0, 'news_sentiment': 0, 'ensemble': 0}
+        self.num_trades = {'mean_reversion': 1, 'trend': 1, 'forecast_based': 1, 'news_sentiment': 1, 'ensemble': 1}
+        self.num_wins = {'mean_reversion': 0, 'trend': 0, 'forecast_based': 0, 'news_sentiment': 0, 'ensemble': 0}
+        self.num_losses = {'mean_reversion': 0, 'trend': 0, 'forecast_based': 0, 'news_sentiment': 0, 'ensemble': 0}
+        self.total_gains = {'mean_reversion': 0, 'trend': 0, 'forecast_based': 0, 'news_sentiment': 0, 'ensemble': 0}
+        self.total_losses = {'mean_reversion': 0, 'trend': 0, 'forecast_based': 0, 'news_sentiment': 0, 'ensemble': 0}
         self.trade_returns = {
             'mean_reversion': [],
             'trend': [],
-            'model_based': [], 
-            'hybrid_mean_reversion': [],
-            'hybrid_trend': [],
+            'forecast_based': [], 
             'news_sentiment': [], 
             'ensemble': []
         }
@@ -38,9 +36,7 @@ class TradingStrategy():
         self.single_slot_positions = {
             'mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
             'trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
-            'model_based': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
-            'hybrid_mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
-            'hybrid_trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
+            'forecast_based': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
             'news_sentiment': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.news_hold_minutes},
             'ensemble': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
         }
@@ -289,24 +285,12 @@ class TradingStrategy():
             elif base_pct_change > 0:
                 trade_direction = 'buy_currency_a'
 
-        elif(strategy_name == "model_based"):
+        elif(strategy_name == "forecast_based"):
             if pred_pct_change < 0:
                 trade_direction = 'sell_currency_a'
             elif pred_pct_change > 0:
                 trade_direction = 'buy_currency_a'
 
-        elif(strategy_name == "hybrid_mean_reversion"):
-            if base_pct_change < 0 and pred_pct_change > 0:
-                trade_direction = 'buy_currency_a'
-            elif base_pct_change > 0 and pred_pct_change < 0:
-                trade_direction = 'sell_currency_a'
-
-        elif(strategy_name == "hybrid_trend"):
-            if base_pct_change < 0 and pred_pct_change < 0:
-                trade_direction = 'sell_currency_a'
-            elif base_pct_change > 0 and pred_pct_change > 0:
-                trade_direction = 'buy_currency_a'
-            
         return trade_direction
 
     def determine_news_sentiment_trade_direction(self, news_sentiment):
@@ -602,7 +586,7 @@ class TradingStrategy():
         self._execute_ensemble_strategy(fx_timestamps_test, actual_rates_test, pred_rates_test, bid_prices_test, ask_prices_test)
         
         print("Executing base strategies...")
-        base_strategy_names = ['mean_reversion', 'trend', 'model_based', 'hybrid_mean_reversion', 'hybrid_trend']
+        base_strategy_names = ['mean_reversion', 'trend', 'forecast_based']
         for strategy_name in base_strategy_names:
             self._execute_trading_strategy(strategy_name, fx_timestamps_test, actual_rates_test, pred_rates_test, 
                                          bid_prices_test, ask_prices_test)
