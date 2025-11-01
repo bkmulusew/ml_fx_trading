@@ -5,7 +5,6 @@ from utils import ModelConfig
 from data_processing import DataProcessor
 from models import DartsFinancialForecastingModel, ChronosFinancialForecastingModel, TotoFinancialForecastingModel
 from metrics import ModelEvaluationMetrics
-from matplotlib import pyplot as plt
 import numpy as np
 import argparse
 import os
@@ -14,7 +13,6 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import torch
 import random
-import numpy as np
 
 def set_seed(seed):
     torch.manual_seed(seed)
@@ -127,44 +125,44 @@ def run_sl_based_trading_strategy(model_config):
     mean_reversion_profit = []
     trend_profit = []
     forecast_based_profit = []
-    news_sentiment_profit = []
-    ensemble_profit = []
+    # news_sentiment_profit = []
+    # ensemble_profit = []
 
     mean_reversion_num_trades = []
     trend_num_trades = []
     forecast_based_num_trades = []
-    news_sentiment_num_trades = []
-    ensemble_num_trades = []
+    # news_sentiment_num_trades = []
+    # ensemble_num_trades = []
 
     for _, values in chunked_values.items():
         if (len(values['true_values']) < 7):
             continue
 
         trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.NEWS_HOLD_MINUTES, True, model_config.ENABLE_TRANSACTION_COSTS, model_config.ALLOW_NEWS_OVERLAP)
-        trading_strategy.simulate_trading_with_strategies(values['fx_timestamps'], values['true_values'], values['predicted_values'], values['bid_prices'], values['ask_prices'], values["news_timestamps"], values["news_sentiments"])
+        trading_strategy.simulate_trading_with_strategies(values['fx_timestamps'], values['true_values'], values['predicted_values'], values['bid_prices'], values['ask_prices'], values['news_timestamps'], values['news_sentiments'])
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
         forecast_based_profit.append(trading_strategy.total_profit_or_loss["forecast_based"])
-        news_sentiment_profit.append(trading_strategy.total_profit_or_loss["news_sentiment"])
-        ensemble_profit.append(trading_strategy.total_profit_or_loss["ensemble"])
+        # news_sentiment_profit.append(trading_strategy.total_profit_or_loss["news_sentiment"])
+        # ensemble_profit.append(trading_strategy.total_profit_or_loss["ensemble"])
 
         mean_reversion_num_trades.append(trading_strategy.num_trades["mean_reversion"])
         trend_num_trades.append(trading_strategy.num_trades["trend"])
         forecast_based_num_trades.append(trading_strategy.num_trades["forecast_based"])
-        news_sentiment_num_trades.append(trading_strategy.num_trades["news_sentiment"])
-        ensemble_num_trades.append(trading_strategy.num_trades["ensemble"])
+        # news_sentiment_num_trades.append(trading_strategy.num_trades["news_sentiment"])
+        # ensemble_num_trades.append(trading_strategy.num_trades["ensemble"])
 
     cumulative_mean_reversion_profit = np.cumsum(mean_reversion_profit)
     cumulative_trend_profit = np.cumsum(trend_profit)
     cumulative_forecast_based_profit = np.cumsum(forecast_based_profit)
     # cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
-    cumulative_ensemble_profit = np.cumsum(ensemble_profit)
+    # cumulative_ensemble_profit = np.cumsum(ensemble_profit)
 
     plt.plot(cumulative_mean_reversion_profit, color='purple', label='Mean Reversion Strategy')
     plt.plot(cumulative_trend_profit, color='blue', label='Trend Strategy')
     plt.plot(cumulative_forecast_based_profit, color='red', label=f'Forecast-Based Strategy')
     # plt.plot(cumulative_news_sentiment_profit, color='pink', label='News Sentiment Strategy')
-    plt.plot(cumulative_ensemble_profit, color='orange', label='Ensemble Strategy')
+    # plt.plot(cumulative_ensemble_profit, color='orange', label='Ensemble Strategy')
     plt.title('Cumulative Profits Using Kelly-Based Position Sizing')
     plt.xlabel('Days')
     plt.ylabel('Cumulative Profit (USD)')
@@ -172,6 +170,11 @@ def run_sl_based_trading_strategy(model_config):
     plt.savefig(f'{model_config.OUTPUT_DIR}/cumulative_profits_kelly.png', dpi=300, bbox_inches='tight')
 
     plt.clf()
+
+    print("Kelly")
+    print(f"Model: {model_config.MODEL_NAME}")
+    print(f"Input Chunk Length: {model_config.INPUT_CHUNK_LENGTH}")
+    print(f"Cummulative Forecast-Based Profit: {cumulative_forecast_based_profit[-1]}")
 
     # Use Fixed Position
     
@@ -183,14 +186,14 @@ def run_sl_based_trading_strategy(model_config):
     mean_reversion_profit = []
     trend_profit = []
     forecast_based_profit = []
-    news_sentiment_profit = []
-    ensemble_profit = []
+    # news_sentiment_profit = []
+    # ensemble_profit = []
 
     mean_reversion_num_trades = []
     trend_num_trades = []
     forecast_based_num_trades = []
-    news_sentiment_num_trades = []
-    ensemble_num_trades = []
+    # news_sentiment_num_trades = []
+    # ensemble_num_trades = []
 
     for _, values in chunked_values.items():
         if (len(values['true_values']) < 7):
@@ -201,26 +204,26 @@ def run_sl_based_trading_strategy(model_config):
         mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
         trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
         forecast_based_profit.append(trading_strategy.total_profit_or_loss["forecast_based"])
-        news_sentiment_profit.append(trading_strategy.total_profit_or_loss["news_sentiment"])
-        ensemble_profit.append(trading_strategy.total_profit_or_loss["ensemble"])
+        # news_sentiment_profit.append(trading_strategy.total_profit_or_loss["news_sentiment"])
+        # ensemble_profit.append(trading_strategy.total_profit_or_loss["ensemble"])
 
         mean_reversion_num_trades.append(trading_strategy.num_trades["mean_reversion"])
         trend_num_trades.append(trading_strategy.num_trades["trend"])
         forecast_based_num_trades.append(trading_strategy.num_trades["forecast_based"])
-        news_sentiment_num_trades.append(trading_strategy.num_trades["news_sentiment"])
-        ensemble_num_trades.append(trading_strategy.num_trades["ensemble"])
+        # news_sentiment_num_trades.append(trading_strategy.num_trades["news_sentiment"])
+        # ensemble_num_trades.append(trading_strategy.num_trades["ensemble"])
 
     cumulative_mean_reversion_profit = np.cumsum(mean_reversion_profit)
     cumulative_trend_profit = np.cumsum(trend_profit)
     cumulative_forecast_based_profit = np.cumsum(forecast_based_profit)
     # cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
-    cumulative_ensemble_profit = np.cumsum(ensemble_profit)
+    # cumulative_ensemble_profit = np.cumsum(ensemble_profit)
 
     plt.plot(cumulative_mean_reversion_profit, color='purple', label='Mean Reversion Strategy')
     plt.plot(cumulative_trend_profit, color='blue', label='Trend Strategy')
     plt.plot(cumulative_forecast_based_profit, color='red', label=f'Forecast-Based Strategy')
     # plt.plot(cumulative_news_sentiment_profit, color='pink', label='News Sentiment Strategy')
-    plt.plot(cumulative_ensemble_profit, color='orange', label='Ensemble Strategy')
+    # plt.plot(cumulative_ensemble_profit, color='orange', label='Ensemble Strategy')
     plt.title('Cumulative Profits Using Fixed Postion Size')
     plt.xlabel('Days')
     plt.ylabel('Cumulative Profit (USD)')
@@ -228,6 +231,11 @@ def run_sl_based_trading_strategy(model_config):
     plt.savefig(f'{model_config.OUTPUT_DIR}/cumulative_profits_fixed.png', dpi=300, bbox_inches='tight')
 
     plt.clf()
+
+    print("Fixed Position")
+    print(f"Model: {model_config.MODEL_NAME}")
+    print(f"Input Chunk Length: {model_config.INPUT_CHUNK_LENGTH}")
+    print(f"Cummulative Forecast-Based Profit: {cumulative_forecast_based_profit[-1]}")
 
 def run(args):
     """Parse command-line arguments and configure the trading model, then run the trading strategy."""

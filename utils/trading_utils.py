@@ -16,8 +16,8 @@ class TradingUtils:
             
             # Avoid division by zero
             if prev_ratio != 0 and curr_ratio != 0:
-                base_pct_inc = ((curr_ratio - prev_ratio) / prev_ratio) * 100
-                pred_pct_inc = ((pred_ratio - curr_ratio) / curr_ratio) * 100
+                base_pct_inc = ((curr_ratio - prev_ratio) / prev_ratio)
+                pred_pct_inc = ((pred_ratio - curr_ratio) / curr_ratio)
             else:
                 print(f"Division by zero at index {i}")
                 base_pct_inc = 0.0
