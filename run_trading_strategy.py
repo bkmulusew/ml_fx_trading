@@ -364,7 +364,8 @@ if __name__ == "__main__":
             "expert_llm_prompt_label",
             "naive_prompt_label",
             "competitor_label",
-            "naive_plus_prompt_converted_label"
+            "naive_plus_prompt_converted_label",
+            "working_paper_label"
         ],
         default="competitor_label",
         help="Choose which sentiment label column to use for trading."
