@@ -33,7 +33,7 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
                 print("Model compiled successfully")
             except Exception as e:
                 print(f"Warning: Could not compile model: {e}")
-            
+
             # Initialize forecaster with the underlying model
             forecaster = TotoForecaster(toto.model)
 
@@ -81,7 +81,7 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
         )
 
         return (X_test_scaled, *meta, news_timestamps, news_sentiments)
-    
+
     def _align_test_targets(self, **test_series):
         """Process all test data series by applying the input chunk length offset."""
         return [
@@ -131,10 +131,10 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
         # Extract predictions using median for robustness
         # forecast.median shape: (batch, variates, prediction_length)
         predictions = forecast.median.cpu().numpy()
-        
+
         # Extract mid price predictions (only variate now)
         mid_predictions = predictions[:, 0, 0]  # Shape: (batch_size,)
-    
+
         return mid_predictions
 
     def generate_predictions(self, data):
@@ -148,7 +148,7 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
 
         if num_predictions <= 0:
             raise ValueError(f"Not enough data points. Need at least {self.model_config.INPUT_CHUNK_LENGTH + 1} timesteps, got {num_timesteps}")
-        
+
         # Allocate storage for predictions
         all_predictions = np.empty(num_predictions, dtype=np.float32)
 
@@ -160,7 +160,7 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
             # Create batch of input sequences
             indices = np.arange(batch_start, batch_end)[:, None] + np.arange(self.model_config.INPUT_CHUNK_LENGTH)
             batch_input = data[indices]  # Shape: (EVAL_BATCH_SIZE, INPUT_CHUNK_LENGTH, 1)
-            
+
             predictions = self.predict_future_values(batch_input)
             all_predictions[batch_start:batch_end] = predictions
 

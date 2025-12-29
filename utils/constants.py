@@ -12,7 +12,6 @@ class ModelConfig:
     FX_DATA_PATH_VAL: str = "ml_fx_trading/dataset/fx/usdcnh-fx-val.csv"
     FX_DATA_PATH_TEST: str = "ml_fx_trading/dataset/fx/usdcnh-fx-test.csv"
     NEWS_DATA_PATH_TRAIN: str = "ml_fx_trading/dataset/news/usdcnh-news-train.csv"
-    NEWS_DATA_PATH_VAL: str = "ml_fx_trading/dataset/news/usdcnh-news-val.csv"
     NEWS_DATA_PATH_TEST: str = "ml_fx_trading/dataset/news/usdcnh-news-test.csv"
     WALLET_A: float = 10000.0
     WALLET_B: float = 10000.0

@@ -16,7 +16,6 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
         self.PRESET_NAME = "bolt_base"
         self.forecaster = self.initialize_model()
 
-
     def initialize_model(self):
         """Load pre-trained predictor"""
         try:
@@ -68,7 +67,7 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
         return [
             series[self.model_config.INPUT_CHUNK_LENGTH:]
             for series in test_series.values()
-        ]    
+        ]
 
     def train(self):
         """No training needed for zero-shot forecasting"""
@@ -85,7 +84,7 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
         try:
             with torch.no_grad():
                 quantiles, mean = self.forecaster.predict_quantiles(inputs, prediction_length=self.model_config.OUTPUT_CHUNK_LENGTH)
-                
+
             predictions = mean.cpu().numpy()
             return predictions
 
@@ -104,7 +103,7 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
 
         if num_predictions <= 0:
             raise ValueError(f"Not enough data points. Need at least {self.model_config.INPUT_CHUNK_LENGTH + 1} timesteps, got {num_timesteps}")
-        
+
         # Allocate storage for predictions
         all_predictions = np.empty(num_predictions, dtype=np.float32)
 
@@ -116,7 +115,7 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
             # Create batch of input sequences
             indices = np.arange(batch_start, batch_end)[:, None] + np.arange(self.model_config.INPUT_CHUNK_LENGTH)
             batch_input = data[indices]  # Shape: (EVAL_BATCH_SIZE, INPUT_CHUNK_LENGTH, 1)
-            
+
             predictions = self.predict_future_values(batch_input)
             all_predictions[batch_start:batch_end] = predictions[:, 0]
 

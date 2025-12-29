@@ -1,0 +1,74 @@
+==========================================
+Running experiment → SRC=finbert_label | HOLD=120
+==========================================
+/Users/beakallemeneh/miniconda3/envs/ml_fx/lib/python3.11/site-packages/lightning_fabric/__init__.py:40: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+/Users/beakallemeneh/miniconda3/envs/ml_fx/lib/python3.11/site-packages/gluonts/json.py:102: UserWarning: Using `json`-module for json-handling. Consider installing one of `orjson`, `ujson` to speed up serialization and deserialization.
+  warnings.warn(
+
+🔧 Model Configuration:
+  Input Chunk Length        : 8
+  Output Chunk Length       : 1
+  Number of Epochs          : 1
+  Train Batch Size          : 1024
+  Eval Batch Size           : 128
+  FX Data Path Train        : dataset/fx/usdbrl-fx-train.csv
+  FX Data Path Val          : dataset/fx/usdbrl-fx-val.csv
+  FX Data Path Test         : dataset/fx/usdbrl-fx-test.csv
+  News Data Path Train      : dataset/news/usdbrl-news-train.csv
+  News Data Path Val        : dataset/news/usdbrl-news-val.csv
+  News Data Path Test       : dataset/news/usdbrl-news-test.csv
+  Wallet A Initial Amount   : 1000000.0
+  Wallet B Initial Amount   : 5420000.0
+  Fractional Kelly Enabled  : True
+  Transaction Costs Enabled : False
+  Output Directory          : /Users/beakallemeneh/Documents/workspace/ml_fx_trading/results/graphs
+  News Hold Minutes         : 120
+  Allow News Overlap        : True
+  Sentiment Source          : finbert_label
+  Seed                      : 42
+  Model Name                : nbeats
+
+Loading nbeats model...
+nbeats model loaded successfully!
+
+Prediction Error for nbeats: {'RMSE': 0.0010017934887496004, 'MASE': 0.39758625945961634, 'MAPE': 0.013956184269127956, 'sMAPE': 0.013956184505281338}
+
+
+News Date key not found: 2024-10-12
+News Date key not found: 2024-11-30
+News Date key not found: 2025-02-01
+News Date key not found: 2025-03-01
+News Date key not found: 2025-08-01
+News Date key not found: 2025-08-07
+News Date key not found: 2025-08-08
+News Date key not found: 2025-08-13
+News Date key not found: 2025-08-14
+News Date key not found: 2025-08-15
+News Date key not found: 2025-08-18
+News Date key not found: 2025-08-19
+News Date key not found: 2025-08-20
+News Date key not found: 2025-08-21
+News Date key not found: 2025-08-22
+News Date key not found: 2025-09-01
+News Date key not found: 2025-09-06
+News Date key not found: 2025-09-07
+News Date key not found: 2025-10-01
+News Date key not found: 2025-10-06
+News Date key not found: 2025-10-07
+News Date key not found: 2025-11-06
+News Date key not found: 2025-11-07
+News Date key not found: 2025-11-08
+News Date key not found: 2025-12-06
+News Date key not found: 2025-12-08
+--------------------------------
+Using Kelly
+--------------------------------
+
+
+Kelly
+Model: nbeats
+Input Chunk Length: 8
+Sentiment Source: finbert_label
+News Hold Minutes: 120
+Cummulative News Sentiment Profit: -20401.40
+
