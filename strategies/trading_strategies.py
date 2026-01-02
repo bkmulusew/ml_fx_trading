@@ -13,26 +13,25 @@ class TradingStrategy():
         # Minimum number of minutes to hold a position before allowing exit for news sentiment strategy
         self.news_hold_minutes = news_hold_minutes
         self.no_hold = -1
-        """Initialize the TradingStrategy class with the initial wallet balances and Kelly fraction option."""
+        """Initialize the TradingStrategy class with the initial wallet balances and Kelly default fraction."""
         # Initialize wallets for different trading strategies
         self.wallet_a = {'mean_reversion': wallet_a, 'trend': wallet_a, 'forecast_based': wallet_a, 'news_sentiment': wallet_a, 'ensemble': wallet_a}
         self.wallet_b = {'mean_reversion': wallet_b, 'trend': wallet_b, 'forecast_based': wallet_b, 'news_sentiment': wallet_b, 'ensemble': wallet_b}
         # Track profit/loss, wins/losses, and total gains/losses for each strategy
-        self.total_profit_or_loss = {'mean_reversion': 0, 'trend': 0, 'forecast_based': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.total_gains = {'mean_reversion': 0, 'trend': 0, 'forecast_based': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.total_losses = {'mean_reversion': 0, 'trend': 0, 'forecast_based': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.num_trades = {'mean_reversion': 1, 'trend': 1, 'forecast_based': 1, 'news_sentiment': 1, 'ensemble': 1}
-        self.num_wins = {'mean_reversion': 0, 'trend': 0, 'forecast_based': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.num_losses = {'mean_reversion': 0, 'trend': 0, 'forecast_based': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.estimated_gains = {'mean_reversion': 0, 'trend': 0, 'forecast_based': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.trade_returns = {
+        self.pnl = {
             'mean_reversion': [],
             'trend': [],
             'forecast_based': [],
             'news_sentiment': [],
             'ensemble': []
         }
-
+        self.total_gain = {'mean_reversion': 0, 'trend': 0, 'forecast_based': 0, 'news_sentiment': 0, 'ensemble': 0}
+        self.total_loss = {'mean_reversion': 0, 'trend': 0, 'forecast_based': 0, 'news_sentiment': 0, 'ensemble': 0}
+        self.total_estimated_gain = {'mean_reversion': 0, 'trend': 0, 'forecast_based': 0, 'news_sentiment': 0, 'ensemble': 0}
+        self.num_trades = {'mean_reversion': 0, 'trend': 0, 'forecast_based': 0, 'news_sentiment': 0, 'ensemble': 0}
+        self.num_wins = {'mean_reversion': 0, 'trend': 0, 'forecast_based': 0, 'news_sentiment': 0, 'ensemble': 0}
+        self.num_losses = {'mean_reversion': 0, 'trend': 0, 'forecast_based': 0, 'news_sentiment': 0, 'ensemble': 0}
+        self.num_estimated_gains = {'mean_reversion': 0, 'trend': 0, 'forecast_based': 0, 'news_sentiment': 0, 'ensemble': 0}
         self.trade_directions = {
             'mean_reversion': [],
             'trend': [],
@@ -41,7 +40,7 @@ class TradingStrategy():
             'ensemble': []
         }
 
-        # New: Track open positions
+        # Tracks open positions
         self.single_slot_positions = {
             'mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
             'trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
@@ -49,27 +48,16 @@ class TradingStrategy():
             'news_sentiment': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.news_hold_minutes},
             'ensemble': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
         }
-
         self.multi_slot_positions = {
-            'news_sentiment': []  # list of per-trade dicts (same shape as a single slot)
+            'news_sentiment': []  # list of open positions (same shape as a single slot)
         }
 
-        self.min_trades_for_full_kelly = 30  # Minimum trades before using full Kelly
+        # Kelly criterion parameters
+        self.min_trades_for_full_kelly = 120  # Minimum trades before using full Kelly
         self.fixed_position_size = 10000  # Fixed position size for training
-        self.min_kelly_fraction = 0.0001 # Minimum Kelly fraction to use
+        self.min_kelly_fraction = 0.0005 # Minimum Kelly fraction to use
 
-        # Initialize XGBoost models with appropriate parameters
-        # self.ensemble_model = XGBRegressor(
-        #     objective='reg:squarederror',   # standard regression objective
-        #     n_estimators=400,
-        #     max_depth=5,
-        #     learning_rate=0.05,
-        #     subsample=0.8,
-        #     colsample_bytree=0.8,
-        #     reg_lambda=2.0,
-        #     random_state=42,
-        # )
-
+        # Ensemble model
         self.ensemble_model = XGBRegressor(
             objective='reg:squarederror',
             n_estimators=100,
@@ -83,10 +71,10 @@ class TradingStrategy():
             gamma=0.1,
             random_state=42,
         )
-
         self.default_ensemble_pred = None
 
     def _get_prices(self, bid_price, ask_price):
+        """Get buy and sell prices based on transaction costs setting."""
         if self.enable_transaction_costs:
             buy_price = ask_price
             sell_price = bid_price
@@ -96,7 +84,7 @@ class TradingStrategy():
         return buy_price, sell_price
 
     def kelly_criterion(self, strategy_name, estimated_gain):
-        """Calculate Kelly fraction with basic risk controls."""
+        """Calculate Kelly fraction."""
         total_trades = self.num_wins[strategy_name] + self.num_losses[strategy_name]
 
         if total_trades < self.min_trades_for_full_kelly:
@@ -105,15 +93,13 @@ class TradingStrategy():
         p = self.num_wins[strategy_name] / total_trades
         q = 1 - p
 
-        avg_gain = (self.total_gains[strategy_name] / self.num_wins[strategy_name]) if self.num_wins[strategy_name] else 1.0
-        avg_loss = (self.total_losses[strategy_name] / self.num_losses[strategy_name]) if self.num_losses[strategy_name] else 1.0
+        avg_gain = (self.total_gain[strategy_name] / self.num_wins[strategy_name]) if self.num_wins[strategy_name] else 1.0
+        avg_loss = (self.total_loss[strategy_name] / self.num_losses[strategy_name]) if self.num_losses[strategy_name] else 1.0
         win_loss_ratio = avg_gain / avg_loss
 
-        h = abs(estimated_gain) / ((self.estimated_gains[strategy_name] + abs(estimated_gain)) / (self.num_trades[strategy_name] + 1))
+        h = abs(estimated_gain) / (self.total_estimated_gain[strategy_name] / self.num_estimated_gains[strategy_name])
 
         f = p - (q / (h * win_loss_ratio))
-
-        f = min(f, self.min_kelly_fraction)
 
         return f
 
@@ -159,6 +145,9 @@ class TradingStrategy():
         # 2) Position sizing (Kelly or fixed)
         if self.use_kelly and strategy_name != 'news_sentiment':
             f_i = self.kelly_criterion(strategy_name, estimated_gain)
+            if f_i <= 0:
+                self.pnl[strategy_name].append(0.0)
+                return
             base_bet_size_a = f_i * total_value_in_a
         else:
             base_bet_size_a = self.fixed_position_size
@@ -198,7 +187,8 @@ class TradingStrategy():
         hold_mins = (self.news_hold_minutes if strategy_name == 'news_sentiment' else self.no_hold)
 
         if strategy_name != 'news_sentiment':
-            self.estimated_gains[strategy_name] += abs(estimated_gain)
+            self.total_estimated_gain[strategy_name] += abs(estimated_gain)
+            self.num_estimated_gains[strategy_name] += 1
 
         if strategy_name == 'news_sentiment' and self.allow_news_overlap:
             self.multi_slot_positions[strategy_name].append({
@@ -254,16 +244,15 @@ class TradingStrategy():
             self.wallet_a[strategy_name] += position['size_a']
 
         if profit_in_curr_a > 0:
-            self.total_gains[strategy_name] += profit_in_curr_a
+            self.total_gain[strategy_name] += profit_in_curr_a
             self.num_wins[strategy_name] += 1
         elif profit_in_curr_a < 0:
-            self.total_losses[strategy_name] += abs(profit_in_curr_a)
+            self.total_loss[strategy_name] += abs(profit_in_curr_a)
             self.num_losses[strategy_name] += 1
 
         # Update profit tracking
         self.num_trades[strategy_name] += 1
-        self.total_profit_or_loss[strategy_name] += profit_in_curr_a
-        self.trade_returns[strategy_name].append(profit_in_curr_a)
+        self.pnl[strategy_name].append(profit_in_curr_a)
 
     def close_position(self, strategy_name, sell_price, buy_price):
         position = self.single_slot_positions[strategy_name]
@@ -336,30 +325,6 @@ class TradingStrategy():
         # Fit
         self.ensemble_model.fit(X, y)
         self.default_ensemble_pred = None
-
-    def display_total_profit(self):
-        """Display the total profit or loss for each strategy."""
-        print(f"Total Profits - {self.total_profit_or_loss}")
-
-    def display_profit_per_trade(self):
-        """Display the average profit or loss per trade for each strategy."""
-        print("Average Profit Per Trade:")
-        for strategy_name in self.total_profit_or_loss.keys():
-            total_trades = self.num_trades[strategy_name]
-            if total_trades > 0:
-                avg_profit = self.total_profit_or_loss[strategy_name] / total_trades
-            else:
-                avg_profit = 0
-            print(f"Profit Per Trade - {strategy_name}: {avg_profit:.2f}")
-
-    def display_final_wallet_amount(self):
-        """Display the final amounts in both wallets for each strategy."""
-        print(f"Final amount in Wallet A - {self.wallet_a}")
-        print(f"Final amount in Wallet B - {self.wallet_b}")
-
-    def diplay_num_trades(self):
-        """Display the number of trades for each strategy."""
-        print(f"Number of trades - {self.num_trades}")
 
     def _generate_training_data(self, actual_rates, pred_rates):
         X, y = [], []
@@ -583,12 +548,6 @@ class TradingStrategy():
             all_strategy_names.append('news_sentiment')
         self._close_all_remaining_positions(all_strategy_names, bid_prices_test[-1], ask_prices_test[-1])
 
-        # Display results
-        # print("=== Trading Simulation Results ===")
-        # self.display_total_profit()
-        # self.diplay_num_trades()
-        # print("\n")
-
     def simulate_trading_with_ensemble_strategy(self, fx_timestamps, actual_rates, pred_rates, bid_prices, ask_prices, news_timestamps, news_sentiments):
         """Simulate trading over a series of exchange rates using ensemble strategy."""
 
@@ -672,9 +631,3 @@ class TradingStrategy():
         # if news_enabled:
         #     all_strategy_names.append('news_sentiment')
         self._close_all_remaining_positions(all_strategy_names, bid_prices_test[-1], ask_prices_test[-1])
-
-        # Display results
-        # print("=== Trading Simulation Results ===")
-        # self.display_total_profit()
-        # self.diplay_num_trades()
-        # print("\n")

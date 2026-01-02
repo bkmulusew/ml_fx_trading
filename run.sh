@@ -25,10 +25,9 @@ for src in "${SENTIMENT_SOURCES[@]}"; do
             --input_chunk_length 16 \
             --fx_data_path_train dataset/fx/usdcny-fx-train.csv \
             --fx_data_path_val dataset/fx/usdcny-fx-val.csv \
-            --fx_data_path_test dataset/fx/usdcny-fx-val.csv \
+            --fx_data_path_test dataset/fx/usdcny-fx-test.csv \
             --news_data_path_train dataset/news/usdcny-news-train.csv \
-            --news_data_path_val dataset/news/usdcny-news-val.csv \
-            --news_data_path_test dataset/news/usdcny-news-val.csv \
+            --news_data_path_test dataset/news/usdcny-news-test.csv \
             --use_frac_kelly \
             --n_epochs 50 \
             --output_dir results/graphs \

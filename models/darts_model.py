@@ -1,32 +1,30 @@
 from models import FinancialForecastingModel
 import pandas as pd
 from darts import TimeSeries
-from darts.dataprocessing.transformers import Scaler
 from darts.models import NHiTSModel, NBEATSModel, TCNModel
 from typing import Dict
 
 class DartsFinancialForecastingModel(FinancialForecastingModel):
     """A financial forecasting model based on the Darts library."""
-    def __init__(self, data_processor, model_config):
-        self.data_processor = data_processor
-        self.scaler = None
-        self.model_config = model_config
-        self.model = self.initialize_model(model_config.MODEL_NAME)
+    def __init__(self, fx_trading_config, scaler):
+        self.scaler = scaler
+        self.fx_trading_config = fx_trading_config
+        self.model = self.initialize_model(fx_trading_config.MODEL_NAME)
 
     def initialize_model(self, model_name):
         """Creates the model."""
         print(f"\nLoading {model_name} model...")
         if model_name == "nbeats":
             model = NBEATSModel(
-                input_chunk_length=self.model_config.INPUT_CHUNK_LENGTH,
-                output_chunk_length=self.model_config.OUTPUT_CHUNK_LENGTH,
+                input_chunk_length=self.fx_trading_config.INPUT_CHUNK_LENGTH,
+                output_chunk_length=self.fx_trading_config.OUTPUT_CHUNK_LENGTH,
                 num_layers=5,
                 num_blocks=1,
                 num_stacks=2,
                 layer_widths=512,
                 dropout=0.2,
-                n_epochs=self.model_config.N_EPOCHS,
-                batch_size=self.model_config.TRAIN_BATCH_SIZE,
+                n_epochs=self.fx_trading_config.N_EPOCHS,
+                batch_size=self.fx_trading_config.TRAIN_BATCH_SIZE,
                 model_name="nbeats",
                 optimizer_kwargs={"lr": 0.0001},
                 pl_trainer_kwargs={
@@ -36,15 +34,15 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
             )
         elif model_name == "nhits":
             model = NHiTSModel(
-                input_chunk_length=self.model_config.INPUT_CHUNK_LENGTH,
-                output_chunk_length=self.model_config.OUTPUT_CHUNK_LENGTH,
+                input_chunk_length=self.fx_trading_config.INPUT_CHUNK_LENGTH,
+                output_chunk_length=self.fx_trading_config.OUTPUT_CHUNK_LENGTH,
                 num_layers=5,
                 num_blocks=1,
                 num_stacks=2,
                 layer_widths=512,
                 dropout=0.2,
-                n_epochs=self.model_config.N_EPOCHS,
-                batch_size=self.model_config.TRAIN_BATCH_SIZE,
+                n_epochs=self.fx_trading_config.N_EPOCHS,
+                batch_size=self.fx_trading_config.TRAIN_BATCH_SIZE,
                 model_name="nhits",
                 optimizer_kwargs={"lr": 0.0001},
                 pl_trainer_kwargs={
@@ -54,14 +52,14 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
             )
         elif model_name == "tcn":
             model = TCNModel(
-                input_chunk_length=self.model_config.INPUT_CHUNK_LENGTH,
-                output_chunk_length=self.model_config.OUTPUT_CHUNK_LENGTH,
+                input_chunk_length=self.fx_trading_config.INPUT_CHUNK_LENGTH,
+                output_chunk_length=self.fx_trading_config.OUTPUT_CHUNK_LENGTH,
                 kernel_size = 3,
                 num_filters = 64,
                 num_layers = 8,
                 dilation_base = 2,
-                n_epochs=self.model_config.N_EPOCHS,
-                batch_size=self.model_config.TRAIN_BATCH_SIZE,
+                n_epochs=self.fx_trading_config.N_EPOCHS,
+                batch_size=self.fx_trading_config.TRAIN_BATCH_SIZE,
                 weight_norm = True,
                 model_name="tcn",
                 dropout = 0.2,
@@ -74,15 +72,15 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
         elif model_name == "ensemble":
             model = {
                 "nbeats": NBEATSModel(
-                    input_chunk_length=self.model_config.INPUT_CHUNK_LENGTH,
-                    output_chunk_length=self.model_config.OUTPUT_CHUNK_LENGTH,
+                    input_chunk_length=self.fx_trading_config.INPUT_CHUNK_LENGTH,
+                    output_chunk_length=self.fx_trading_config.OUTPUT_CHUNK_LENGTH,
                     num_layers=5,
                     num_blocks=1,
                     num_stacks=2,
                     layer_widths=512,
                     dropout=0.2,
-                    n_epochs=self.model_config.N_EPOCHS,
-                    batch_size=self.model_config.TRAIN_BATCH_SIZE,
+                    n_epochs=self.fx_trading_config.N_EPOCHS,
+                    batch_size=self.fx_trading_config.TRAIN_BATCH_SIZE,
                     model_name="nbeats",
                     optimizer_kwargs={"lr": 0.0001},
                     pl_trainer_kwargs={
@@ -91,15 +89,15 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
                     },
                 ),
                 "nhits": NHiTSModel(
-                    input_chunk_length=self.model_config.INPUT_CHUNK_LENGTH,
-                    output_chunk_length=self.model_config.OUTPUT_CHUNK_LENGTH,
+                    input_chunk_length=self.fx_trading_config.INPUT_CHUNK_LENGTH,
+                    output_chunk_length=self.fx_trading_config.OUTPUT_CHUNK_LENGTH,
                     num_layers=5,
                     num_blocks=1,
                     num_stacks=2,
                     layer_widths=512,
                     dropout=0.2,
-                    n_epochs=self.model_config.N_EPOCHS,
-                    batch_size=self.model_config.TRAIN_BATCH_SIZE,
+                    n_epochs=self.fx_trading_config.N_EPOCHS,
+                    batch_size=self.fx_trading_config.TRAIN_BATCH_SIZE,
                     model_name="nhits",
                     optimizer_kwargs={"lr": 0.0001},
                     pl_trainer_kwargs={
@@ -108,14 +106,14 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
                     },
                 ),
                 # "tcn": TCNModel(
-                #     input_chunk_length=self.model_config.INPUT_CHUNK_LENGTH,
-                #     output_chunk_length=self.model_config.OUTPUT_CHUNK_LENGTH,
+                #     input_chunk_length=self.fx_trading_config.INPUT_CHUNK_LENGTH,
+                #     output_chunk_length=self.fx_trading_config.OUTPUT_CHUNK_LENGTH,
                 #     kernel_size = 3,
                 #     num_filters = 64,
                 #     num_layers = 8,
                 #     dilation_base = 2,
-                #     n_epochs=self.model_config.N_EPOCHS,
-                #     batch_size=self.model_config.TRAIN_BATCH_SIZE,
+                #     n_epochs=self.fx_trading_config.N_EPOCHS,
+                #     batch_size=self.fx_trading_config.TRAIN_BATCH_SIZE,
                 #     weight_norm = True,
                 #     model_name="tcn",
                 #     dropout = 0.2,
@@ -131,52 +129,6 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
 
         print(f"{model_name} model loaded successfully!")
         return model
-
-    def split_and_scale_data(self):
-        """Splits the data into training, validation, and test sets and applies scaling."""
-        data = self.data_processor.prepare_data()
-
-        fx_timestamps = data["fx_timestamps"]
-        news_timestamps = data["news_timestamps"]
-        bid_prices = data["bid_prices"]
-        ask_prices = data["ask_prices"]
-        news_sentiments = data["news_sentiments"]
-
-        mid_prices = data["mid_price_series"]
-        train_mid_prices = mid_prices["train"]
-        val_mid_prices = mid_prices["val"]
-        test_mid_prices = mid_prices["test"]
-
-        test_mid_prices_pd_copy = test_mid_prices.pd_series(copy=True)
-        self.test_mid_prices = test_mid_prices_pd_copy[self.model_config.INPUT_CHUNK_LENGTH:].values.tolist()
-
-        # Scale the series data
-        scaled_series = self._scale_series_data(train_mid_prices, val_mid_prices, test_mid_prices)
-
-        # Process test data
-        test_data = self._process_test_data(
-            fx_timestamps=fx_timestamps,
-            bid_prices=bid_prices,
-            ask_prices=ask_prices,
-        )
-
-        return (*scaled_series, *test_data, news_timestamps, news_sentiments)
-
-    def _process_test_data(self, **test_series):
-        """Process all test data series by applying the input chunk length offset."""
-        return [
-            series[self.model_config.INPUT_CHUNK_LENGTH:]
-            for series in test_series.values()
-        ]
-
-    def _scale_series_data(self, train_series, val_series, test_series):
-        """Scale the series data using the Scaler."""
-        self.scaler = Scaler()
-        return (
-            self.scaler.fit_transform(train_series),
-            self.scaler.transform(val_series),
-            self.scaler.transform(test_series)
-        )
 
     def train(self, train_series, validation_series=None):
         """Trains the model."""
@@ -201,13 +153,13 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
             preds = {}
             for name, model in self.model.items():
                 preds[name] = model.predict(
-                    self.model_config.OUTPUT_CHUNK_LENGTH,
+                    self.fx_trading_config.OUTPUT_CHUNK_LENGTH,
                     series=test_series,
                 )
             return preds
         else:
             return self.model.predict(
-                self.model_config.OUTPUT_CHUNK_LENGTH,
+                self.fx_trading_config.OUTPUT_CHUNK_LENGTH,
                 series=test_series,
             )
 
@@ -215,8 +167,8 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
         """Generates predictions for each window of the test series."""
         transformed_series = []
 
-        for i in range(len(test_series) - self.model_config.INPUT_CHUNK_LENGTH):
-            transformed_series.append(test_series[i: i + self.model_config.INPUT_CHUNK_LENGTH])
+        for i in range(len(test_series) - self.fx_trading_config.INPUT_CHUNK_LENGTH):
+            transformed_series.append(test_series[i: i + self.fx_trading_config.INPUT_CHUNK_LENGTH])
 
         pred_series = self.predict_future_values(transformed_series)
 

@@ -11,7 +11,6 @@ class TradingUtils:
             - list: return (base_pct_incs, pred_pct_incs)
             - dict of lists: return (base_pct_incs, {model: pred_pct_incs})
         """
-
         base_pct_incs = [0.0]
 
         # Case 1: pred_rates is a list

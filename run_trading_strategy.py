@@ -1,10 +1,10 @@
 # importing to set up reproducibility
 import os
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-from utils import ModelConfig
+from utils import FXTradingConfig
 from data_processing import DataProcessor
 from models import DartsFinancialForecastingModel, ChronosFinancialForecastingModel, TotoFinancialForecastingModel
-from metrics import ModelEvaluationMetrics
+from metrics import ModelEvalMetrics
 import numpy as np
 import argparse
 import os
@@ -23,15 +23,15 @@ def set_seed(seed):
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
-def plot_prediction_comparison(true_values, predicted_values, model_config):
+def plot_prediction_comparison(true_values, predicted_values, fx_trading_config):
     """Plot true vs predicted values and save the figure."""
     plt.plot(true_values, color='blue', label='True')
-    plt.plot(predicted_values, color='red', label=f'{model_config.MODEL_NAME} Prediction')
-    plt.title(f'True and Predicted Values (Model: {model_config.MODEL_NAME})')
+    plt.plot(predicted_values, color='red', label=f'{fx_trading_config.MODEL_NAME} Prediction')
+    plt.title(f'True and Predicted Values (Model: {fx_trading_config.MODEL_NAME})')
     plt.xlabel('Observations')
     plt.ylabel('Ratio')
     plt.legend()
-    plt.savefig(f'{model_config.OUTPUT_DIR}/true_vs_predicted_{model_config.MODEL_NAME}.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'{fx_trading_config.OUTPUT_DIR}/true_vs_predicted_{fx_trading_config.MODEL_NAME}.png', dpi=300, bbox_inches='tight')
     plt.clf()
 
 def group_data_by_date(
@@ -61,8 +61,6 @@ def group_data_by_date(
     })
 
     n = len(true_values)
-    # Sanity check (optional)
-    # assert len(fx_timestamps) == len(bid_prices) == len(ask_prices) == n
 
     for i in range(n):
         fx_timestamp = fx_timestamps[i]
@@ -119,42 +117,48 @@ def group_data_by_date(
 #     # Add 1 to avoid p = 0
 #     return (count + 1) / (N + 1)
 
-def run_ml_based_trading_strategies(model_config):
+def run_ml_based_trading_strategies(fx_trading_config):
     """Run a trading strategy based on a supervised learning model, including model training, prediction,
     and evaluation of trading performance."""
-    set_seed(model_config.SEED)
+    set_seed(fx_trading_config.SEED)
     torch.set_float32_matmul_precision("high")
 
     # Initialize metrics evaluator
-    eval_metrics = ModelEvaluationMetrics()
+    eval_metrics = ModelEvalMetrics()
 
-    # Initialize data processor
-    dataProcessor = DataProcessor(model_config)
+    # Initialize data processor and split/scale data ONCE
+    dataProcessor = DataProcessor(fx_trading_config)
+    processed_data = dataProcessor.split_and_scale_data()
+
+    # Extract test metadata from processed data
+    test_fx_timestamps = processed_data.test_fx_timestamps
+    test_bid_prices = processed_data.test_bid_prices
+    test_ask_prices = processed_data.test_ask_prices
+    test_news_timestamps = processed_data.test_news_timestamps
+    test_news_sentiments = processed_data.test_news_sentiments
+    true_values = processed_data.test_mid_prices
 
     # Train model and get predictions
-    if model_config.MODEL_NAME == 'toto':
-        predictor = TotoFinancialForecastingModel(dataProcessor, model_config)
-        test_series, test_fx_timestamps, test_bid_prices, test_ask_prices, test_news_timestamps, test_news_sentiments = predictor.split_and_scale_data()
-        predicted_values = predictor.generate_predictions(test_series)
-        true_values = predictor.test_mid_prices
-    elif model_config.MODEL_NAME == 'chronos':
-        predictor = ChronosFinancialForecastingModel(dataProcessor, model_config)
-        test_series, test_fx_timestamps, test_bid_prices, test_ask_prices, test_news_timestamps, test_news_sentiments = predictor.split_and_scale_data()
-        predicted_values = predictor.generate_predictions(test_series)
-        true_values = predictor.test_mid_prices
-    elif model_config.MODEL_NAME == 'ensemble':
-        predictor1 = DartsFinancialForecastingModel(dataProcessor, model_config)
-        train_series, valid_series, test_series, test_fx_timestamps, test_bid_prices, test_ask_prices, test_news_timestamps, test_news_sentiments = predictor1.split_and_scale_data()
-        predictor1.train(train_series)
-        predicted_values1 = predictor1.generate_predictions(test_series)
-        model_config.MODEL_NAME = "chronos"
-        predictor2 = ChronosFinancialForecastingModel(dataProcessor, model_config)
-        test_series2, _, _, _, _, _ = predictor2.split_and_scale_data()
-        predicted_values2 = predictor2.generate_predictions(test_series2)
-        model_config.MODEL_NAME = "toto"
-        predictor3 = TotoFinancialForecastingModel(dataProcessor, model_config)
-        test_series3, _, _, _, _, _ = predictor3.split_and_scale_data()
-        predicted_values3 = predictor3.generate_predictions(test_series3)
+    if fx_trading_config.MODEL_NAME == 'toto':
+        predictor = TotoFinancialForecastingModel(fx_trading_config, processed_data.llm_scaler)
+        predicted_values = predictor.generate_predictions(processed_data.llm_test_scaled)
+    elif fx_trading_config.MODEL_NAME == 'chronos':
+        predictor = ChronosFinancialForecastingModel(fx_trading_config, processed_data.llm_scaler)
+        predicted_values = predictor.generate_predictions(processed_data.llm_test_scaled)
+    elif fx_trading_config.MODEL_NAME == 'ensemble':
+        # Darts models
+        predictor1 = DartsFinancialForecastingModel(fx_trading_config, processed_data.darts_scaler)
+        predictor1.train(processed_data.darts_train_scaled, processed_data.darts_val_scaled)
+        predicted_values1 = predictor1.generate_predictions(processed_data.darts_test_scaled)
+
+        # Chronos model
+        predictor2 = ChronosFinancialForecastingModel(fx_trading_config, processed_data.llm_scaler)
+        predicted_values2 = predictor2.generate_predictions(processed_data.llm_test_scaled)
+
+        # Toto model
+        predictor3 = TotoFinancialForecastingModel(fx_trading_config, processed_data.llm_scaler)
+        predicted_values3 = predictor3.generate_predictions(processed_data.llm_test_scaled)
+
         predicted_values = {
             **predicted_values1,
             "chronos": predicted_values2,
@@ -162,29 +166,18 @@ def run_ml_based_trading_strategies(model_config):
         }
         for key, value in predicted_values.items():
             print(f"length of predicted values {key}: {len(value)}")
-        true_values = predictor1.test_mid_prices
         print(f"length of true values: {len(true_values)}")
     else:
-        predictor = DartsFinancialForecastingModel(dataProcessor, model_config)
-        train_series, valid_series, test_series, test_fx_timestamps, test_bid_prices, test_ask_prices, test_news_timestamps, test_news_sentiments = predictor.split_and_scale_data()
-        predictor.train(train_series, valid_series)
-        predicted_values = predictor.generate_predictions(test_series)
-        true_values = predictor.test_mid_prices
-        # noise_std = 0.001
-
-        # noisy_values = [
-        #     v + random.gauss(0, noise_std)
-        #     for v in true_values
-        # ]
-
-        # predicted_values = [max(v, 0) for v in noisy_values]
+        predictor = DartsFinancialForecastingModel(fx_trading_config, processed_data.darts_scaler)
+        predictor.train(processed_data.darts_train_scaled, processed_data.darts_val_scaled)
+        predicted_values = predictor.generate_predictions(processed_data.darts_test_scaled)
 
     # Calculate and print the prediction error.
     # prediction_error_model = eval_metrics.calculate_prediction_error(predicted_values, true_values)
-    # print(f"\nPrediction Error for {model_config.MODEL_NAME}: {prediction_error_model}")
+    # print(f"\nPrediction Error for {fx_trading_config.MODEL_NAME}: {prediction_error_model}")
     # print (f"\n")
 
-    # plot_prediction_comparison(true_values, predicted_values, model_config)
+    plot_prediction_comparison(true_values, predicted_values, fx_trading_config)
 
     # Group data by date for trading simulation
     chunked_values = group_data_by_date(
@@ -221,24 +214,22 @@ def run_ml_based_trading_strategies(model_config):
     news_sentiment_num_trades = []
     ensemble_num_trades = []
 
-    for _, values in chunked_values.items():
-        if (len(values['true_values']) < 7):
-            continue
+    trading_strategy = TradingStrategy(fx_trading_config.WALLET_A, fx_trading_config.WALLET_B, fx_trading_config.NEWS_HOLD_MINUTES, True, fx_trading_config.ENABLE_TRANSACTION_COSTS, fx_trading_config.ALLOW_NEWS_OVERLAP)
 
-        trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.NEWS_HOLD_MINUTES, True, model_config.ENABLE_TRANSACTION_COSTS, model_config.ALLOW_NEWS_OVERLAP)
+    for _, values in chunked_values.items():
         trading_strategy.simulate_trading_with_strategies(values['fx_timestamps'], values['true_values'], values['predicted_values'], values['bid_prices'], values['ask_prices'], values['news_timestamps'], values['news_sentiments'])
         # trading_strategy.simulate_trading_with_ensemble_strategy(values['fx_timestamps'], values['true_values'], values['predicted_values'], values['bid_prices'], values['ask_prices'], values['news_timestamps'], values['news_sentiments'])
-        mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
-        trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
-        forecast_based_profit.append(trading_strategy.total_profit_or_loss["forecast_based"])
-        news_sentiment_profit.append(trading_strategy.total_profit_or_loss["news_sentiment"])
-        ensemble_profit.append(trading_strategy.total_profit_or_loss["ensemble"])
+    mean_reversion_profit.extend(trading_strategy.pnl["mean_reversion"])
+    trend_profit.extend(trading_strategy.pnl["trend"])
+    forecast_based_profit.extend(trading_strategy.pnl["forecast_based"])
+    news_sentiment_profit.extend(trading_strategy.pnl["news_sentiment"])
+    ensemble_profit.extend(trading_strategy.pnl["ensemble"])
 
-        mean_reversion_num_trades.append(trading_strategy.num_trades["mean_reversion"])
-        trend_num_trades.append(trading_strategy.num_trades["trend"])
-        forecast_based_num_trades.append(trading_strategy.num_trades["forecast_based"])
-        news_sentiment_num_trades.append(trading_strategy.num_trades["news_sentiment"])
-        ensemble_num_trades.append(trading_strategy.num_trades["ensemble"])
+    mean_reversion_num_trades.append(trading_strategy.num_trades["mean_reversion"])
+    trend_num_trades.append(trading_strategy.num_trades["trend"])
+    forecast_based_num_trades.append(trading_strategy.num_trades["forecast_based"])
+    news_sentiment_num_trades.append(trading_strategy.num_trades["news_sentiment"])
+    ensemble_num_trades.append(trading_strategy.num_trades["ensemble"])
 
         # total_profits.append(sum(news_sentiment_profit))
 
@@ -260,15 +251,15 @@ def run_ml_based_trading_strategies(model_config):
     plt.xlabel('Days')
     plt.ylabel('Cumulative Profit (USD)')
     plt.legend()
-    plt.savefig(f'{model_config.OUTPUT_DIR}/cumulative_profits_kelly.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'{fx_trading_config.OUTPUT_DIR}/cumulative_profits_kelly.png', dpi=300, bbox_inches='tight')
 
     plt.clf()
 
     print("Kelly")
-    print(f"Model: {model_config.MODEL_NAME}")
-    print(f"Input Chunk Length: {model_config.INPUT_CHUNK_LENGTH}")
-    print(f"Sentiment Source: {model_config.SENTIMENT_SOURCE}")
-    print(f"News Hold Minutes: {model_config.NEWS_HOLD_MINUTES}")
+    print(f"Model: {fx_trading_config.MODEL_NAME}")
+    print(f"Input Chunk Length: {fx_trading_config.INPUT_CHUNK_LENGTH}")
+    print(f"Sentiment Source: {fx_trading_config.SENTIMENT_SOURCE}")
+    print(f"News Hold Minutes: {fx_trading_config.NEWS_HOLD_MINUTES}")
     print(f"Cummulative Mean Reversion Profit: {cumulative_mean_reversion_profit[-1]}")
     print(f"Cummulative Trend Profit: {cumulative_trend_profit[-1]}")
     print(f"Cummulative Forecast-Based Profit: {cumulative_forecast_based_profit[-1]}")
@@ -299,7 +290,7 @@ def run_ml_based_trading_strategies(model_config):
     #     if (len(values['true_values']) < 7):
     #         continue
 
-    #     trading_strategy = TradingStrategy(model_config.WALLET_A, model_config.WALLET_B, model_config.NEWS_HOLD_MINUTES, False, model_config.ENABLE_TRANSACTION_COSTS, model_config.ALLOW_NEWS_OVERLAP)
+    #     trading_strategy = TradingStrategy(fx_trading_config.WALLET_A, fx_trading_config.WALLET_B, fx_trading_config.NEWS_HOLD_MINUTES, False, fx_trading_config.ENABLE_TRANSACTION_COSTS, fx_trading_config.ALLOW_NEWS_OVERLAP)
     #     trading_strategy.simulate_trading_with_strategies(values['fx_timestamps'], values['true_values'], values['predicted_values'], values['bid_prices'], values['ask_prices'], values["news_timestamps"], values["news_sentiments"])
     #     mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
     #     trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
@@ -328,50 +319,50 @@ def run_ml_based_trading_strategies(model_config):
     # plt.xlabel('Days')
     # plt.ylabel('Cumulative Profit (USD)')
     # plt.legend()
-    # plt.savefig(f'{model_config.OUTPUT_DIR}/cumulative_profits_fixed.png', dpi=300, bbox_inches='tight')
+    # plt.savefig(f'{fx_trading_config.OUTPUT_DIR}/cumulative_profits_fixed.png', dpi=300, bbox_inches='tight')
 
     # plt.clf()
 
     # print("Fixed Position")
-    # print(f"Model: {model_config.MODEL_NAME}")
-    # print(f"Input Chunk Length: {model_config.INPUT_CHUNK_LENGTH}")
+    # print(f"Model: {fx_trading_config.MODEL_NAME}")
+    # print(f"Input Chunk Length: {fx_trading_config.INPUT_CHUNK_LENGTH}")
     # print(f"Cummulative Forecast-Based Profit: {cumulative_forecast_based_profit[-1]}")
     # print(f"Cummulative News Sentiment Profit: {cumulative_news_sentiment_profit[-1]}")
 
 def run(args):
     """Parse command-line arguments and configure the trading model, then run the trading strategy."""
-    model_config = ModelConfig()
-    model_config.INPUT_CHUNK_LENGTH = args.input_chunk_length
-    model_config.OUTPUT_CHUNK_LENGTH = args.output_chunk_length
-    model_config.N_EPOCHS = args.n_epochs
-    model_config.TRAIN_BATCH_SIZE = args.train_batch_size
-    model_config.EVAL_BATCH_SIZE = args.eval_batch_size
-    model_config.FX_DATA_PATH_TRAIN = args.fx_data_path_train
-    model_config.FX_DATA_PATH_VAL = args.fx_data_path_val
-    model_config.FX_DATA_PATH_TEST = args.fx_data_path_test
-    model_config.NEWS_DATA_PATH_TRAIN = args.news_data_path_train
-    model_config.NEWS_DATA_PATH_TEST = args.news_data_path_test
-    model_config.WALLET_A = args.wallet_a
-    model_config.WALLET_B = args.wallet_b
-    model_config.USE_FRAC_KELLY = args.use_frac_kelly
-    model_config.ENABLE_TRANSACTION_COSTS = args.enable_transaction_costs
-    model_config.NEWS_HOLD_MINUTES = args.news_hold_minutes
-    model_config.ALLOW_NEWS_OVERLAP = args.allow_news_overlap
-    model_config.SENTIMENT_SOURCE = args.sentiment_source
-    model_config.SEED = args.seed
+    fx_trading_config = FXTradingConfig()
+    fx_trading_config.INPUT_CHUNK_LENGTH = args.input_chunk_length
+    fx_trading_config.OUTPUT_CHUNK_LENGTH = args.output_chunk_length
+    fx_trading_config.N_EPOCHS = args.n_epochs
+    fx_trading_config.TRAIN_BATCH_SIZE = args.train_batch_size
+    fx_trading_config.EVAL_BATCH_SIZE = args.eval_batch_size
+    fx_trading_config.FX_DATA_PATH_TRAIN = args.fx_data_path_train
+    fx_trading_config.FX_DATA_PATH_VAL = args.fx_data_path_val
+    fx_trading_config.FX_DATA_PATH_TEST = args.fx_data_path_test
+    fx_trading_config.NEWS_DATA_PATH_TRAIN = args.news_data_path_train
+    fx_trading_config.NEWS_DATA_PATH_TEST = args.news_data_path_test
+    fx_trading_config.WALLET_A = args.wallet_a
+    fx_trading_config.WALLET_B = args.wallet_b
+    fx_trading_config.USE_FRAC_KELLY = args.use_frac_kelly
+    fx_trading_config.ENABLE_TRANSACTION_COSTS = args.enable_transaction_costs
+    fx_trading_config.NEWS_HOLD_MINUTES = args.news_hold_minutes
+    fx_trading_config.ALLOW_NEWS_OVERLAP = args.allow_news_overlap
+    fx_trading_config.SENTIMENT_SOURCE = args.sentiment_source
+    fx_trading_config.SEED = args.seed
 
     root_dir = os.path.dirname(os.path.abspath(__file__))
-    model_config.OUTPUT_DIR = os.path.join(root_dir, args.output_dir)
-    os.makedirs(model_config.OUTPUT_DIR, exist_ok=True)
+    fx_trading_config.OUTPUT_DIR = os.path.join(root_dir, args.output_dir)
+    os.makedirs(fx_trading_config.OUTPUT_DIR, exist_ok=True)
 
-    model_config.MODEL_NAME = args.model_name
+    fx_trading_config.MODEL_NAME = args.model_name
 
-    print_model_config(model_config)
+    print_fx_trading_config(fx_trading_config)
 
     # Run the trading strategy based on the specified model and configuration.
-    run_ml_based_trading_strategies(model_config)
+    run_ml_based_trading_strategies(fx_trading_config)
 
-def print_model_config(config):
+def print_fx_trading_config(config):
     print("\n🔧 Model Configuration:")
     print(f"  Input Chunk Length        : {config.INPUT_CHUNK_LENGTH}")
     print(f"  Output Chunk Length       : {config.OUTPUT_CHUNK_LENGTH}")

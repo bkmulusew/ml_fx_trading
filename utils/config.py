@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 @dataclass
-class ModelConfig:
+class FXTradingConfig:
     MODEL_NAME: str = "tcn"
     INPUT_CHUNK_LENGTH: int = 64
     OUTPUT_CHUNK_LENGTH: int = 1

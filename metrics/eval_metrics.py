@@ -1,6 +1,6 @@
 import numpy as np
 
-class ModelEvaluationMetrics:
+class ModelEvalMetrics:
     def calculate_smape(self, actual, predicted):
         """Calculates the Symmetric Mean Absolute Percentage Error (SMAPE)."""
         actual, predicted = np.asarray(actual), np.asarray(predicted)
