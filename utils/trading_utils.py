@@ -44,7 +44,7 @@ class TradingUtils:
                 curr_ratio = actual_rates[i]
                 prev_ratio = actual_rates[i - 1]
 
-                if prev_ratio != 0 and curr_ratio != 0:
+                if prev_ratio != 0:
                     base_pct_inc = (curr_ratio - prev_ratio) / prev_ratio
                 else:
                     base_pct_inc = 0.0

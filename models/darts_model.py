@@ -28,8 +28,8 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
                 model_name="nbeats",
                 optimizer_kwargs={"lr": 0.0001},
                 pl_trainer_kwargs={
-                "accelerator": "cpu",
-                # "devices": [0]
+                    "accelerator": "gpu",
+                    "devices": [0]
                 },
             )
         elif model_name == "nhits":
@@ -46,8 +46,8 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
                 model_name="nhits",
                 optimizer_kwargs={"lr": 0.0001},
                 pl_trainer_kwargs={
-                "accelerator": "cpu",
-                # "devices": [0]
+                    "accelerator": "gpu",
+                    "devices": [0]
                 },
             )
         elif model_name == "tcn":
@@ -64,10 +64,10 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
                 model_name="tcn",
                 dropout = 0.2,
                 optimizer_kwargs={"lr": 0.0001},
-                pl_trainer_kwargs = {
-                    "accelerator": "cpu",
-                    # "devices": [0]
-                }
+                pl_trainer_kwargs={
+                    "accelerator": "gpu",
+                    "devices": [0]
+                },
             )
         elif model_name == "ensemble":
             model = {
@@ -84,8 +84,8 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
                     model_name="nbeats",
                     optimizer_kwargs={"lr": 0.0001},
                     pl_trainer_kwargs={
-                    "accelerator": "cpu",
-                    # "devices": [0]
+                        "accelerator": "gpu",
+                        "devices": [0]
                     },
                 ),
                 "nhits": NHiTSModel(
@@ -101,28 +101,28 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
                     model_name="nhits",
                     optimizer_kwargs={"lr": 0.0001},
                     pl_trainer_kwargs={
-                    "accelerator": "cpu",
-                    # "devices": [0]
+                        "accelerator": "gpu",
+                        "devices": [0]
                     },
                 ),
-                # "tcn": TCNModel(
-                #     input_chunk_length=self.fx_trading_config.INPUT_CHUNK_LENGTH,
-                #     output_chunk_length=self.fx_trading_config.OUTPUT_CHUNK_LENGTH,
-                #     kernel_size = 3,
-                #     num_filters = 64,
-                #     num_layers = 8,
-                #     dilation_base = 2,
-                #     n_epochs=self.fx_trading_config.N_EPOCHS,
-                #     batch_size=self.fx_trading_config.TRAIN_BATCH_SIZE,
-                #     weight_norm = True,
-                #     model_name="tcn",
-                #     dropout = 0.2,
-                #     optimizer_kwargs={"lr": 0.0001},
-                #     pl_trainer_kwargs = {
-                #         "accelerator": "cpu",
-                #         # "devices": [0]
-                #     }
-                # )
+                "tcn": TCNModel(
+                    input_chunk_length=self.fx_trading_config.INPUT_CHUNK_LENGTH,
+                    output_chunk_length=self.fx_trading_config.OUTPUT_CHUNK_LENGTH,
+                    kernel_size = 3,
+                    num_filters = 64,
+                    num_layers = 8,
+                    dilation_base = 2,
+                    n_epochs=self.fx_trading_config.N_EPOCHS,
+                    batch_size=self.fx_trading_config.TRAIN_BATCH_SIZE,
+                    weight_norm = True,
+                    model_name="tcn",
+                    dropout = 0.2,
+                    optimizer_kwargs={"lr": 0.0001},
+                    pl_trainer_kwargs={
+                        "accelerator": "gpu",
+                        "devices": [0]
+                    },
+                )
             }
         else:
             raise ValueError("Invalid model name.")

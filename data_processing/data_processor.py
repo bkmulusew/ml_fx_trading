@@ -80,7 +80,7 @@ class DataProcessor:
             if len(tied) == 1:
                 return tied[0]  # Normal majority
             else:
-                return 0
+                return 0  # No trade sentiment
 
         # For each minute, take the majority sentiment
         agg = (
