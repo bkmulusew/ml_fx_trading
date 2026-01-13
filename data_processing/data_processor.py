@@ -45,7 +45,7 @@ class DataProcessor:
         news_timestamps = news_data_test["date"].tolist()
         news_sentiments = news_data_test[self.model_config.SENTIMENT_SOURCE].tolist()
         
-        if self.model_config.MODEL_NAME == 'toto' or self.model_config.MODEL_NAME == 'chronos':
+        if self.model_config.MODEL_NAME == 'toto' or self.model_config.MODEL_NAME == 'chronos' or self.model_config.MODEL_NAME == 'chronos2':
             mid_price_series_train = fx_data_train["mid_price"].values
             mid_price_series_val = fx_data_val["mid_price"].values
             mid_price_series_test = fx_data_test["mid_price"].values

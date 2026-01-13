@@ -3,7 +3,7 @@ import os
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 from utils import ModelConfig
 from data_processing import DataProcessor
-from models import DartsFinancialForecastingModel, ChronosFinancialForecastingModel, TotoFinancialForecastingModel
+from models import DartsFinancialForecastingModel, ChronosFinancialForecastingModel, TotoFinancialForecastingModel, Chronos2FinancialForecastingModel
 from metrics import ModelEvaluationMetrics
 import numpy as np
 import argparse
@@ -88,6 +88,11 @@ def run_sl_based_trading_strategy(model_config):
         true_values = predictor.test_mid_prices
     elif model_config.MODEL_NAME == 'chronos':
         predictor = ChronosFinancialForecastingModel(dataProcessor, model_config)
+        test_series, test_fx_timestamps, test_bid_prices, test_ask_prices, test_news_timestamps, test_news_sentiments = predictor.split_and_scale_data()
+        predicted_values = predictor.generate_predictions(test_series)
+        true_values = predictor.test_mid_prices
+    elif model_config.MODEL_NAME == 'chronos2':
+        predictor = Chronos2FinancialForecastingModel(dataProcessor, model_config)
         test_series, test_fx_timestamps, test_bid_prices, test_ask_prices, test_news_timestamps, test_news_sentiments = predictor.split_and_scale_data()
         predicted_values = predictor.generate_predictions(test_series)
         true_values = predictor.test_mid_prices
@@ -308,7 +313,8 @@ if __name__ == "__main__":
             "nhits",
             "tcn",
             "toto",
-            "chronos"
+            "chronos",
+            "chronos2"
         ],
         default="tcn",
         help="Specify the model to use. Default is 'tcn'."
@@ -358,7 +364,8 @@ if __name__ == "__main__":
             "expert_llm_prompt_label",
             "naive_prompt_label",
             "competitor_label",
-            "naive_plus_prompt_converted_label"
+            "naive_plus_prompt_converted_label",
+            "working_paper_label"
         ],
         default="competitor_label",
         help="Choose which sentiment label column to use for trading."
