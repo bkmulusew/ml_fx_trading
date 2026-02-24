@@ -7,10 +7,6 @@ class FinancialForecastingModel(ABC):
         pass
 
     @abstractmethod
-    def split_and_scale_data(self):
-        pass
-
-    @abstractmethod
     def train(self):
         pass
 
