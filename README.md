@@ -92,7 +92,6 @@ python ml_fx_trading/run_trading_strategy.py \
     --news_data_path_test /path/to/news/data/test.csv \
     --n_epochs 1 \
     --output_dir results/graphs \
-    --use_frac_kelly
 ```
 
 The full list of flags and options for the python script is as follows:
@@ -111,7 +110,7 @@ The full list of flags and options for the python script is as follows:
 --news_data_path_train: Path to the news training data.
 --news_data_path_val: Path to the news validation data.
 --news_data_path_test: Path to the news test data.
---use_frac_kelly: Enable fractional kelly to size bets.
+--bet_sizing: Bet sizing strategy. Options: active_kelly, passive_kelly, or fixed.
 --enable_transaction_costs: Enable transaction costs.
 --output_dir: Directory to save all outputs.
 --news-hold-minutes: Number of minutes to hold a position before allowing exit for news sentiment strategy.
