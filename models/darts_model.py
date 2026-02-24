@@ -1,7 +1,7 @@
 from models import FinancialForecastingModel
 import pandas as pd
 from darts import TimeSeries
-from darts.models import NHiTSModel, NBEATSModel, TCNModel
+from darts.models import ARIMA, NBEATSModel, NHiTSModel, TCNModel
 from typing import Dict
 
 class DartsFinancialForecastingModel(FinancialForecastingModel):
@@ -14,7 +14,9 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
     def initialize_model(self, model_name):
         """Creates the model."""
         print(f"\nLoading {model_name} model...")
-        if model_name == "nbeats":
+        if model_name == "arima":
+            model = ARIMA(p=1, d=1, q=1)
+        elif model_name == "nbeats":
             model = NBEATSModel(
                 input_chunk_length=self.fx_trading_config.INPUT_CHUNK_LENGTH,
                 output_chunk_length=self.fx_trading_config.OUTPUT_CHUNK_LENGTH,
@@ -71,6 +73,7 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
             )
         elif model_name == "ensemble":
             model = {
+                "arima": ARIMA(p=1, d=1, q=1),
                 "nbeats": NBEATSModel(
                     input_chunk_length=self.fx_trading_config.INPUT_CHUNK_LENGTH,
                     output_chunk_length=self.fx_trading_config.OUTPUT_CHUNK_LENGTH,
@@ -136,15 +139,21 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
             # Enable training of all the models in ensemble
             for name, model in self.model.items():
                 print(f"Training {name} model...")
-                if validation_series is not None:
-                    model.fit(train_series, val_series=validation_series, verbose=False)
+                if name == "arima":
+                    pass
                 else:
-                    model.fit(train_series, verbose=False)
+                    if validation_series is not None:
+                        model.fit(train_series, val_series=validation_series, verbose=False)
+                    else:
+                        model.fit(train_series, verbose=False)
         else:
-            if validation_series is not None:
-                self.model.fit(train_series, val_series=validation_series, verbose=False)
+            if self.fx_trading_config.MODEL_NAME == "arima":
+                pass
             else:
-                self.model.fit(train_series, verbose=False)
+                if validation_series is not None:
+                    self.model.fit(train_series, val_series=validation_series, verbose=False)
+                else:
+                    self.model.fit(train_series, verbose=False)
 
     def predict_future_values(self, test_series):
         """Makes future value predictions based on the test series."""
@@ -152,12 +161,30 @@ class DartsFinancialForecastingModel(FinancialForecastingModel):
             # Enable prediction of all the models in ensemble
             preds = {}
             for name, model in self.model.items():
-                preds[name] = model.predict(
-                    self.fx_trading_config.OUTPUT_CHUNK_LENGTH,
-                    series=test_series,
-                )
+                if name == "arima":
+                    arima_preds = []
+                    for window in test_series:
+                        # predict OUTPUT_CHUNK_LENGTH steps ahead
+                        model.fit(window)
+                        arima_pred = model.predict(self.fx_trading_config.OUTPUT_CHUNK_LENGTH)
+                        arima_preds.append(arima_pred)
+                    preds[name] = arima_preds
+                else:
+                    preds[name] = model.predict(
+                        self.fx_trading_config.OUTPUT_CHUNK_LENGTH,
+                        series=test_series,
+                    )
             return preds
         else:
+            if self.fx_trading_config.MODEL_NAME == "arima":
+                preds = []
+                # here, test_series is a list of TimeSeries windows
+                for window in test_series:
+                    # predict OUTPUT_CHUNK_LENGTH steps ahead
+                    self.model.fit(window)
+                    pred = self.model.predict(self.fx_trading_config.OUTPUT_CHUNK_LENGTH)
+                    preds.append(pred)
+                return preds
             return self.model.predict(
                 self.fx_trading_config.OUTPUT_CHUNK_LENGTH,
                 series=test_series,

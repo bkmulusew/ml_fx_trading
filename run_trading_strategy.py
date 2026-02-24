@@ -4,16 +4,13 @@ os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 from utils import FXTradingConfig
 from data_processing import DataProcessor
 from models import DartsFinancialForecastingModel, ChronosFinancialForecastingModel, TotoFinancialForecastingModel
-from metrics import ModelEvalMetrics
 import numpy as np
 import argparse
-import os
 from strategies import TradingStrategy
 from collections import defaultdict
 import matplotlib.pyplot as plt
 import torch
 import random
-from collections import defaultdict
 from typing import List, Dict, Union
 
 def set_seed(seed):
@@ -22,17 +19,6 @@ def set_seed(seed):
     random.seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
-
-def plot_prediction_comparison(true_values, predicted_values, fx_trading_config):
-    """Plot true vs predicted values and save the figure."""
-    plt.plot(true_values, color='blue', label='True')
-    plt.plot(predicted_values, color='red', label=f'{fx_trading_config.MODEL_NAME} Prediction')
-    plt.title(f'True and Predicted Values (Model: {fx_trading_config.MODEL_NAME})')
-    plt.xlabel('Observations')
-    plt.ylabel('Ratio')
-    plt.legend()
-    plt.savefig(f'{fx_trading_config.OUTPUT_DIR}/true_vs_predicted_{fx_trading_config.MODEL_NAME}.png', dpi=300, bbox_inches='tight')
-    plt.clf()
 
 def group_data_by_date(
     fx_timestamps,
@@ -101,30 +87,11 @@ def group_data_by_date(
 
     return chunked_values
 
-# def p_value_null_greater(simulated, observed):
-#     """
-#     One-sided non-parametric p-value.
-#     Tests H0: null distribution generates values >= observed.
-#     """
-#     sims = np.array(simulated)
-#     N = len(sims)
-
-#     if N == 0:
-#         raise ValueError("simulated list must not be empty")
-
-#     count = np.sum(sims >= observed)
-    
-#     # Add 1 to avoid p = 0
-#     return (count + 1) / (N + 1)
-
 def run_ml_based_trading_strategies(fx_trading_config):
     """Run a trading strategy based on a supervised learning model, including model training, prediction,
     and evaluation of trading performance."""
     set_seed(fx_trading_config.SEED)
     torch.set_float32_matmul_precision("high")
-
-    # Initialize metrics evaluator
-    eval_metrics = ModelEvalMetrics()
 
     # Initialize data processor and split/scale data ONCE
     dataProcessor = DataProcessor(fx_trading_config)
@@ -164,20 +131,10 @@ def run_ml_based_trading_strategies(fx_trading_config):
             "chronos": predicted_values2,
             "toto": predicted_values3
         }
-        for key, value in predicted_values.items():
-            print(f"length of predicted values {key}: {len(value)}")
-        print(f"length of true values: {len(true_values)}")
     else:
         predictor = DartsFinancialForecastingModel(fx_trading_config, processed_data.darts_scaler)
         predictor.train(processed_data.darts_train_scaled, processed_data.darts_val_scaled)
         predicted_values = predictor.generate_predictions(processed_data.darts_test_scaled)
-
-    # Calculate and print the prediction error.
-    # prediction_error_model = eval_metrics.calculate_prediction_error(predicted_values, true_values)
-    # print(f"\nPrediction Error for {fx_trading_config.MODEL_NAME}: {prediction_error_model}")
-    # print (f"\n")
-
-    plot_prediction_comparison(true_values, predicted_values, fx_trading_config)
 
     # Group data by date for trading simulation
     chunked_values = group_data_by_date(
@@ -190,145 +147,129 @@ def run_ml_based_trading_strategies(fx_trading_config):
         test_news_sentiments
     )
 
-    # Use Kelly
-    print("--------------------------------")
-    print("Using Kelly")
-    print("--------------------------------")
-    print("\n")
-
-    # total_profits = []
-
-    # actual_profit = -20401.40
-
-    # for i in range(10000):
-
     mean_reversion_profit = []
     trend_profit = []
-    forecast_based_profit = []
+    model_driven_profit = []
     news_sentiment_profit = []
     ensemble_profit = []
 
     mean_reversion_num_trades = []
     trend_num_trades = []
-    forecast_based_num_trades = []
+    model_driven_num_trades = []
     news_sentiment_num_trades = []
     ensemble_num_trades = []
 
-    trading_strategy = TradingStrategy(fx_trading_config.WALLET_A, fx_trading_config.WALLET_B, fx_trading_config.NEWS_HOLD_MINUTES, True, fx_trading_config.ENABLE_TRANSACTION_COSTS, fx_trading_config.ALLOW_NEWS_OVERLAP)
+    # True if we are running the ensemble meta-model
+    is_ensemble_model = fx_trading_config.MODEL_NAME == 'ensemble'
 
-    for _, values in chunked_values.items():
-        trading_strategy.simulate_trading_with_strategies(values['fx_timestamps'], values['true_values'], values['predicted_values'], values['bid_prices'], values['ask_prices'], values['news_timestamps'], values['news_sentiments'])
-        # trading_strategy.simulate_trading_with_ensemble_strategy(values['fx_timestamps'], values['true_values'], values['predicted_values'], values['bid_prices'], values['ask_prices'], values['news_timestamps'], values['news_sentiments'])
-    mean_reversion_profit.extend(trading_strategy.pnl["mean_reversion"])
-    trend_profit.extend(trading_strategy.pnl["trend"])
-    forecast_based_profit.extend(trading_strategy.pnl["forecast_based"])
-    news_sentiment_profit.extend(trading_strategy.pnl["news_sentiment"])
-    ensemble_profit.extend(trading_strategy.pnl["ensemble"])
+    trading_strategy = TradingStrategy(
+        fx_trading_config.WALLET_A,
+        fx_trading_config.WALLET_B,
+        fx_trading_config.NEWS_HOLD_MINUTES,
+        fx_trading_config.BET_SIZING,
+        fx_trading_config.ENABLE_TRANSACTION_COSTS,
+        fx_trading_config.ALLOW_NEWS_OVERLAP,
+    )
+
+    for date_key, values in chunked_values.items():
+        prev_mean_reversion_profit = sum(trading_strategy.pnl["mean_reversion"])
+        prev_trend_profit = sum(trading_strategy.pnl["trend"])
+        prev_model_driven_profit = sum(trading_strategy.pnl["model_driven"])
+        prev_news_sentiment_profit = sum(trading_strategy.pnl["news_sentiment"])
+        prev_ensemble_profit = sum(trading_strategy.pnl["ensemble"])
+
+        if is_ensemble_model:
+            # Run mean reversion, trend, and news sentiment using only actual rates
+            # (place-holder predictions so that strategies not using them still work)
+            trading_strategy.simulate_trading_with_strategies(
+                values['fx_timestamps'],
+                values['true_values'],
+                values['true_values'],
+                values['bid_prices'],
+                values['ask_prices'],
+                values['news_timestamps'],
+                values['news_sentiments'],
+                strategy_names=['mean_reversion', 'trend'],
+            )
+
+            # Run the ensemble meta-model strategy using per-model predictions
+            trading_strategy.simulate_trading_with_ensemble_strategy(
+                values['fx_timestamps'],
+                values['true_values'],
+                values['predicted_values'],
+                values['bid_prices'],
+                values['ask_prices'],
+                seed=fx_trading_config.SEED,
+            )
+        else:
+            # Non-ensemble models: run mean reversion, trend, model-driven, and news sentiment
+            trading_strategy.simulate_trading_with_strategies(
+                values['fx_timestamps'],
+                values['true_values'],
+                values['predicted_values'],
+                values['bid_prices'],
+                values['ask_prices'],
+                values['news_timestamps'],
+                values['news_sentiments'],
+            )
+
+        current_mean_reversion_profit = sum(trading_strategy.pnl["mean_reversion"])
+        current_trend_profit = sum(trading_strategy.pnl["trend"])
+        current_model_driven_profit = sum(trading_strategy.pnl["model_driven"])
+        current_news_sentiment_profit = sum(trading_strategy.pnl["news_sentiment"])
+        current_ensemble_profit = sum(trading_strategy.pnl["ensemble"])
+
+        mean_reversion_profit.append(current_mean_reversion_profit - prev_mean_reversion_profit)
+        trend_profit.append(current_trend_profit - prev_trend_profit)
+        news_sentiment_profit.append(current_news_sentiment_profit - prev_news_sentiment_profit)
+
+        if is_ensemble_model:
+            ensemble_profit.append(current_ensemble_profit - prev_ensemble_profit)
+        else:
+            model_driven_profit.append(current_model_driven_profit - prev_model_driven_profit)
 
     mean_reversion_num_trades.append(trading_strategy.num_trades["mean_reversion"])
     trend_num_trades.append(trading_strategy.num_trades["trend"])
-    forecast_based_num_trades.append(trading_strategy.num_trades["forecast_based"])
     news_sentiment_num_trades.append(trading_strategy.num_trades["news_sentiment"])
-    ensemble_num_trades.append(trading_strategy.num_trades["ensemble"])
 
-        # total_profits.append(sum(news_sentiment_profit))
+    if is_ensemble_model:
+        ensemble_num_trades.append(trading_strategy.num_trades["ensemble"])
+    else:
+        model_driven_num_trades.append(trading_strategy.num_trades["model_driven"])
 
     cumulative_mean_reversion_profit = np.cumsum(mean_reversion_profit)
     cumulative_trend_profit = np.cumsum(trend_profit)
-    cumulative_forecast_based_profit = np.cumsum(forecast_based_profit)
     cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
-    cumulative_ensemble_profit = np.cumsum(ensemble_profit)
 
-    # p_value = p_value_null_greater(total_profits, actual_profit)
-    # print(f"P-value: {p_value:.4f}")
+    if is_ensemble_model:
+        cumulative_ensemble_profit = np.cumsum(ensemble_profit)
+    else:
+        cumulative_model_driven_profit = np.cumsum(model_driven_profit)
 
     plt.plot(cumulative_mean_reversion_profit, color='purple', label='Mean Reversion Strategy')
     plt.plot(cumulative_trend_profit, color='blue', label='Trend Strategy')
-    plt.plot(cumulative_forecast_based_profit, color='red', label=f'Forecast-Based Strategy')
-    # plt.plot(cumulative_news_sentiment_profit, color='pink', label='News Sentiment Strategy')
-    # plt.plot(cumulative_ensemble_profit, color='orange', label='Ensemble Strategy')
-    plt.title('Cumulative Profits Using Kelly-Based Position Sizing')
+    plt.plot(cumulative_news_sentiment_profit, color='black', label=f'News-LLM Strategy ({fx_trading_config.SENTIMENT_SOURCE})')
+
+    if is_ensemble_model:
+        plt.plot(cumulative_ensemble_profit, color='orange', label='Ensemble Strategy')
+    else:
+        plt.plot(cumulative_model_driven_profit, color='red', label=f'Model-Driven Strategy ({fx_trading_config.MODEL_NAME})')
+    plt.title('Cumulative Profits')
     plt.xlabel('Days')
     plt.ylabel('Cumulative Profit (USD)')
     plt.legend()
-    plt.savefig(f'{fx_trading_config.OUTPUT_DIR}/cumulative_profits_kelly.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'{fx_trading_config.OUTPUT_DIR}/cumulative_profits.png', dpi=300, bbox_inches='tight')
 
     plt.clf()
 
-    print("Kelly")
-    print(f"Model: {fx_trading_config.MODEL_NAME}")
-    print(f"Input Chunk Length: {fx_trading_config.INPUT_CHUNK_LENGTH}")
-    print(f"Sentiment Source: {fx_trading_config.SENTIMENT_SOURCE}")
-    print(f"News Hold Minutes: {fx_trading_config.NEWS_HOLD_MINUTES}")
-    print(f"Cummulative Mean Reversion Profit: {cumulative_mean_reversion_profit[-1]}")
-    print(f"Cummulative Trend Profit: {cumulative_trend_profit[-1]}")
-    print(f"Cummulative Forecast-Based Profit: {cumulative_forecast_based_profit[-1]}")
+    print(f"Cummulative Mean Reversion Profit: {cumulative_mean_reversion_profit[-1]:.2f}")
+    print(f"Cummulative Trend Profit: {cumulative_trend_profit[-1]:.2f}")
     print(f"Cummulative News Sentiment Profit: {cumulative_news_sentiment_profit[-1]:.2f}")
-    print(f"Cummulative Ensemble Profit: {cumulative_ensemble_profit[-1]}")
-    # print(f"Profit per Trade: {cumulative_news_sentiment_profit[-1] / sum(news_sentiment_num_trades):.3f}")
-    # print(f"Profit per Trade: {cumulative_ensemble_profit[-1] / sum(ensemble_num_trades):.3f}")
-
-    # Use Fixed Position
-    # print('\n')
-    # print("--------------------------------")
-    # print("Using Fixed Position")
-    # print("--------------------------------")
-    # print("\n")
-    # mean_reversion_profit = []
-    # trend_profit = []
-    # forecast_based_profit = []
-    # news_sentiment_profit = []
-    # # ensemble_profit = []
-
-    # mean_reversion_num_trades = []
-    # trend_num_trades = []
-    # forecast_based_num_trades = []
-    # news_sentiment_num_trades = []
-    # # ensemble_num_trades = []
-
-    # for _, values in chunked_values.items():
-    #     if (len(values['true_values']) < 7):
-    #         continue
-
-    #     trading_strategy = TradingStrategy(fx_trading_config.WALLET_A, fx_trading_config.WALLET_B, fx_trading_config.NEWS_HOLD_MINUTES, False, fx_trading_config.ENABLE_TRANSACTION_COSTS, fx_trading_config.ALLOW_NEWS_OVERLAP)
-    #     trading_strategy.simulate_trading_with_strategies(values['fx_timestamps'], values['true_values'], values['predicted_values'], values['bid_prices'], values['ask_prices'], values["news_timestamps"], values["news_sentiments"])
-    #     mean_reversion_profit.append(trading_strategy.total_profit_or_loss["mean_reversion"])
-    #     trend_profit.append(trading_strategy.total_profit_or_loss["trend"])
-    #     forecast_based_profit.append(trading_strategy.total_profit_or_loss["forecast_based"])
-    #     news_sentiment_profit.append(trading_strategy.total_profit_or_loss["news_sentiment"])
-    #     # ensemble_profit.append(trading_strategy.total_profit_or_loss["ensemble"])
-
-    #     mean_reversion_num_trades.append(trading_strategy.num_trades["mean_reversion"])
-    #     trend_num_trades.append(trading_strategy.num_trades["trend"])
-    #     forecast_based_num_trades.append(trading_strategy.num_trades["forecast_based"])
-    #     news_sentiment_num_trades.append(trading_strategy.num_trades["news_sentiment"])
-    #     # ensemble_num_trades.append(trading_strategy.num_trades["ensemble"])
-
-    # cumulative_mean_reversion_profit = np.cumsum(mean_reversion_profit)
-    # cumulative_trend_profit = np.cumsum(trend_profit)
-    # cumulative_forecast_based_profit = np.cumsum(forecast_based_profit)
-    # cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
-    # # cumulative_ensemble_profit = np.cumsum(ensemble_profit)
-
-    # plt.plot(cumulative_mean_reversion_profit, color='purple', label='Mean Reversion Strategy')
-    # plt.plot(cumulative_trend_profit, color='blue', label='Trend Strategy')
-    # plt.plot(cumulative_forecast_based_profit, color='red', label=f'Forecast-Based Strategy')
-    # # plt.plot(cumulative_news_sentiment_profit, color='pink', label='News Sentiment Strategy')
-    # # plt.plot(cumulative_ensemble_profit, color='orange', label='Ensemble Strategy')
-    # plt.title('Cumulative Profits Using Fixed Postion Size')
-    # plt.xlabel('Days')
-    # plt.ylabel('Cumulative Profit (USD)')
-    # plt.legend()
-    # plt.savefig(f'{fx_trading_config.OUTPUT_DIR}/cumulative_profits_fixed.png', dpi=300, bbox_inches='tight')
-
-    # plt.clf()
-
-    # print("Fixed Position")
-    # print(f"Model: {fx_trading_config.MODEL_NAME}")
-    # print(f"Input Chunk Length: {fx_trading_config.INPUT_CHUNK_LENGTH}")
-    # print(f"Cummulative Forecast-Based Profit: {cumulative_forecast_based_profit[-1]}")
-    # print(f"Cummulative News Sentiment Profit: {cumulative_news_sentiment_profit[-1]}")
-
+    if is_ensemble_model:
+        print(f"Cummulative Ensemble Profit: {cumulative_ensemble_profit[-1]:.2f}")
+    else:
+        print(f"Cummulative Model-Driven Profit: {cumulative_model_driven_profit[-1]:.2f}")
+    
 def run(args):
     """Parse command-line arguments and configure the trading model, then run the trading strategy."""
     fx_trading_config = FXTradingConfig()
@@ -344,7 +285,7 @@ def run(args):
     fx_trading_config.NEWS_DATA_PATH_TEST = args.news_data_path_test
     fx_trading_config.WALLET_A = args.wallet_a
     fx_trading_config.WALLET_B = args.wallet_b
-    fx_trading_config.USE_FRAC_KELLY = args.use_frac_kelly
+    fx_trading_config.BET_SIZING = args.bet_sizing
     fx_trading_config.ENABLE_TRANSACTION_COSTS = args.enable_transaction_costs
     fx_trading_config.NEWS_HOLD_MINUTES = args.news_hold_minutes
     fx_trading_config.ALLOW_NEWS_OVERLAP = args.allow_news_overlap
@@ -376,7 +317,7 @@ def print_fx_trading_config(config):
     print(f"  News Data Path Test       : {config.NEWS_DATA_PATH_TEST}")
     print(f"  Wallet A Initial Amount   : {config.WALLET_A}")
     print(f"  Wallet B Initial Amount   : {config.WALLET_B}")
-    print(f"  Fractional Kelly Enabled  : {config.USE_FRAC_KELLY}")
+    print(f"  Bet Sizing                : {config.BET_SIZING}")
     print(f"  Transaction Costs Enabled : {config.ENABLE_TRANSACTION_COSTS}")
     print(f"  Output Directory          : {config.OUTPUT_DIR}")
     print(f"  News Hold Minutes         : {config.NEWS_HOLD_MINUTES}")
@@ -394,12 +335,13 @@ if __name__ == "__main__":
         "--model_name",
         type=str,
         choices=[
+            "arima",
             "nbeats",
             "nhits",
             "tcn",
             "toto",
             "chronos",
-            "ensemble"
+            "ensemble",
         ],
         default="tcn",
         help="Specify the model to use. Default is 'tcn'."
@@ -432,7 +374,13 @@ if __name__ == "__main__":
     )
     parser.add_argument("--news_data_path_train", type=str, default="", help="Path to the news training data.", required=True)
     parser.add_argument("--news_data_path_test", type=str, default="", help="Path to the news test data.", required=True)
-    parser.add_argument("--use_frac_kelly", action="store_true", help="Use fractional Kelly to size bets. Default is False.")
+    parser.add_argument(
+        "--bet_sizing",
+        type=str,
+        choices=["active_kelly", "passive_kelly", "fixed"],
+        default="fixed",
+        help="Bet sizing strategy: active_kelly, passive_kelly, or fixed. Default is fixed."
+    )
     parser.add_argument("--enable_transaction_costs", action="store_true", help="Enable transaction costs. Default is False.")
     parser.add_argument("--output_dir", type=str, default="results/usd-cny-2023", help="Directory to save all outputs.")
     parser.add_argument(

@@ -7,6 +7,7 @@ from models.toto.toto.model.toto import Toto
 
 NUM_SAMPLES: int = 64
 TIME_INTERVAL_SECONDS: float = 60.0
+
 class TotoFinancialForecastingModel(FinancialForecastingModel):
     """Financial forecasting model using Toto's pre-trained transformer for zero-shot forecasting"""
     def __init__(self, fx_trading_config, scaler):

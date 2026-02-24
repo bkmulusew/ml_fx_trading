@@ -15,7 +15,7 @@ class FXTradingConfig:
     NEWS_DATA_PATH_TEST: str = "ml_fx_trading/dataset/news/usdcnh-news-test.csv"
     WALLET_A: float = 10000.0
     WALLET_B: float = 10000.0
-    USE_FRAC_KELLY: bool = True
+    BET_SIZING: str = "fixed"
     ENABLE_TRANSACTION_COSTS: bool = False
     OUTPUT_DIR: str = "results/usd-cnh"
     NEWS_HOLD_MINUTES: int = 3
