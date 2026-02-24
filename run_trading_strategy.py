@@ -257,7 +257,8 @@ def run_ml_based_trading_strategies(fx_trading_config):
     plt.title('Cumulative Profits')
     plt.xlabel('Days')
     plt.ylabel('Cumulative Profit (USD)')
-    plt.legend()
+    plt.legend(loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=2)
+    plt.tight_layout()
     plt.savefig(f'{fx_trading_config.OUTPUT_DIR}/cumulative_profits.png', dpi=300, bbox_inches='tight')
 
     plt.clf()
