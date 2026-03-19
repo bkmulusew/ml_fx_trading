@@ -21,6 +21,8 @@ class ModelEvalMetrics:
         actual, predicted = np.asarray(actual), np.asarray(predicted)
         n = len(actual)
         d = np.abs(np.diff(actual)).sum() / (n - 1)
+        if d == 0:
+            return 0.0
         errors = np.abs(actual - predicted)
         return errors.mean() / d
 
@@ -29,10 +31,10 @@ class ModelEvalMetrics:
         actual, predicted = np.asarray(actual), np.asarray(predicted)
         return np.sqrt(((predicted - actual) ** 2).mean())
 
-    def calculate_prediction_error(self, predicted_values, true_values):
+    def calculate_prediction_error(self, actual, predicted):
         """Calculates the prediction error."""
-        smape = self.calculate_smape(predicted_values, true_values)
-        mape = self.calculate_mape(predicted_values, true_values)
-        mase = self.calculate_mase(predicted_values, true_values)
-        rmse = self.calculate_rmse(predicted_values, true_values)
+        smape = self.calculate_smape(actual, predicted)
+        mape = self.calculate_mape(actual, predicted)
+        mase = self.calculate_mase(actual, predicted)
+        rmse = self.calculate_rmse(actual, predicted)
         return {'RMSE': rmse, 'MASE': mase, 'MAPE': mape, 'sMAPE': smape}

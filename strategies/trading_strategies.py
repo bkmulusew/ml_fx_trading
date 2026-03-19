@@ -197,11 +197,11 @@ class TradingStrategy():
             return self.min_kelly_fraction
 
         if self.bet_sizing == 'active_kelly':
-            # Use actual wins/losses for probability calculation
             p = self.num_actual_wins[strategy_name] / total_actual_trades
         elif self.bet_sizing == 'passive_kelly':
-            # Use potential wins/losses for probability calculation
             total_potential_trades = self.num_potential_wins[strategy_name] + self.num_potential_losses[strategy_name]
+            if total_potential_trades == 0:
+                return self.min_kelly_fraction
             p = self.num_potential_wins[strategy_name] / total_potential_trades
 
         q = 1 - p
@@ -217,7 +217,7 @@ class TradingStrategy():
 
         f = p - (q / (h * win_loss_ratio))
 
-        return f
+        return max(f, 0.0)
 
     def _track_potential_outcome(self, strategy_name, prev_trade_direction, actual_pct_change):
         """

@@ -77,11 +77,12 @@ def group_data_by_date(
                     day_bucket["predicted_values"][model_name] = []
                 day_bucket["predicted_values"][model_name].append(preds[i])
 
-    # Attach news by date
+    # Attach news by date (only to days that have FX data)
     for news_timestamp, news_sentiment in zip(news_timestamps, news_sentiments):
         date_key = news_timestamp.date()
         if date_key not in chunked_values:
             print(f"News Date key not found: {date_key}")
+            continue
         chunked_values[date_key]["news_timestamps"].append(news_timestamp)
         chunked_values[date_key]["news_sentiments"].append(news_sentiment)
 
@@ -171,7 +172,7 @@ def run_ml_based_trading_strategies(fx_trading_config):
         fx_trading_config.ALLOW_NEWS_OVERLAP,
     )
 
-    for date_key, values in chunked_values.items():
+    for date_key, values in sorted(chunked_values.items()):
         prev_mean_reversion_profit = sum(trading_strategy.pnl["mean_reversion"])
         prev_trend_profit = sum(trading_strategy.pnl["trend"])
         prev_model_driven_profit = sum(trading_strategy.pnl["model_driven"])

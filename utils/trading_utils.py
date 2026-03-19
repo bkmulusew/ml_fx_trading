@@ -22,11 +22,14 @@ class TradingUtils:
                 prev_ratio = actual_rates[i - 1]
                 pred_ratio = pred_rates[i + 1]
 
-                if prev_ratio != 0 and curr_ratio != 0:
+                if prev_ratio != 0:
                     base_pct_inc = (curr_ratio - prev_ratio) / prev_ratio
-                    pred_pct_inc = (pred_ratio - curr_ratio) / curr_ratio
                 else:
                     base_pct_inc = 0.0
+
+                if curr_ratio != 0:
+                    pred_pct_inc = (pred_ratio - curr_ratio) / curr_ratio
+                else:
                     pred_pct_inc = 0.0
 
                 base_pct_incs.append(base_pct_inc)
