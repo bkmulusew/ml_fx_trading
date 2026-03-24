@@ -21,4 +21,5 @@ class FXTradingConfig:
     NEWS_HOLD_MINUTES: int = 3
     ALLOW_NEWS_OVERLAP: bool = False
     SENTIMENT_SOURCE: str = "competitor_label"
+    KELLY_WINDOW_DAYS: int = None
     SEED: int = 59

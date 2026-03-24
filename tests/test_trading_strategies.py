@@ -7,6 +7,25 @@ pytestmark = pytest.mark.unit
 
 STRATEGIES = ["mean_reversion", "trend", "model_driven", "news_sentiment", "ensemble"]
 
+
+def _populate_kelly_data(ts, strategy, n_wins, n_losses, total_gain, total_loss,
+                         n_potential_wins=0, n_potential_losses=0,
+                         total_estimated_gain=0.0, n_estimated_gains=0, day=0):
+    """Populate windowed Kelly data for testing."""
+    avg_win = total_gain / n_wins if n_wins else 0
+    avg_loss = total_loss / n_losses if n_losses else 0
+    for _ in range(n_wins):
+        ts._kelly_actual_outcomes[strategy].append((day, avg_win))
+    for _ in range(n_losses):
+        ts._kelly_actual_outcomes[strategy].append((day, -avg_loss))
+    for _ in range(n_potential_wins):
+        ts._kelly_potential_outcomes[strategy].append((day, True))
+    for _ in range(n_potential_losses):
+        ts._kelly_potential_outcomes[strategy].append((day, False))
+    avg_est = total_estimated_gain / n_estimated_gains if n_estimated_gains else 0
+    for _ in range(n_estimated_gains):
+        ts._kelly_estimated_gains[strategy].append((day, avg_est))
+
 # ---------------------------------------------------------------------------
 # Initialization
 # ---------------------------------------------------------------------------
@@ -25,10 +44,15 @@ class TestInitialization:
         ts = trading_strategy_instance
         for s in STRATEGIES:
             assert ts.num_trades[s] == 0
-            assert ts.num_actual_wins[s] == 0
-            assert ts.num_actual_losses[s] == 0
-            assert ts.num_potential_wins[s] == 0
-            assert ts.num_potential_losses[s] == 0
+
+    def test_initial_kelly_rolling_window_empty(self, trading_strategy_instance):
+        ts = trading_strategy_instance
+        assert ts._kelly_day_index == 0
+        assert ts.kelly_window_days is None
+        for s in STRATEGIES:
+            assert ts._kelly_actual_outcomes[s] == []
+            assert ts._kelly_potential_outcomes[s] == []
+            assert ts._kelly_estimated_gains[s] == []
 
     def test_initial_positions_none(self, trading_strategy_instance):
         for s in STRATEGIES:
@@ -105,22 +129,21 @@ class TestNewsSentimentDirection:
 # kelly_criterion
 # ---------------------------------------------------------------------------
 class TestKellyCriterion:
-    def test_kelly_below_min_trades_returns_min_fraction(self, trading_strategy_instance):
-        ts = trading_strategy_instance
-        ts.num_actual_wins["trend"] = 5
-        ts.num_actual_losses["trend"] = 3
-        f = ts.kelly_criterion("trend", 0.01)
+    def test_kelly_below_min_trades_returns_min_fraction(self):
+        ts = TradingStrategy(10000, 10000, 3, "active_kelly", False)
+        s = "trend"
+        _populate_kelly_data(ts, s, n_wins=5, n_losses=3,
+                             total_gain=5.0, total_loss=3.0,
+                             total_estimated_gain=4.0, n_estimated_gains=8)
+        f = ts.kelly_criterion(s, 0.01)
         assert f == ts.min_kelly_fraction
 
     def test_kelly_active_uses_actual_wins(self):
         ts = TradingStrategy(10000, 10000, 3, "active_kelly", False)
         s = "trend"
-        ts.num_actual_wins[s] = 80
-        ts.num_actual_losses[s] = 50
-        ts.total_gain[s] = 100.0
-        ts.total_loss[s] = 60.0
-        ts.total_estimated_gain[s] = 50.0
-        ts.num_estimated_gains[s] = 130
+        _populate_kelly_data(ts, s, n_wins=80, n_losses=50,
+                             total_gain=100.0, total_loss=60.0,
+                             total_estimated_gain=50.0, n_estimated_gains=130)
         f = ts.kelly_criterion(s, 0.5)
         assert isinstance(f, float)
         p = 80 / 130
@@ -136,14 +159,10 @@ class TestKellyCriterion:
     def test_kelly_passive_uses_potential_wins(self):
         ts = TradingStrategy(10000, 10000, 3, "passive_kelly", False)
         s = "model_driven"
-        ts.num_actual_wins[s] = 80
-        ts.num_actual_losses[s] = 50
-        ts.num_potential_wins[s] = 90
-        ts.num_potential_losses[s] = 40
-        ts.total_gain[s] = 100.0
-        ts.total_loss[s] = 60.0
-        ts.total_estimated_gain[s] = 50.0
-        ts.num_estimated_gains[s] = 130
+        _populate_kelly_data(ts, s, n_wins=80, n_losses=50,
+                             total_gain=100.0, total_loss=60.0,
+                             n_potential_wins=90, n_potential_losses=40,
+                             total_estimated_gain=50.0, n_estimated_gains=130)
         f = ts.kelly_criterion(s, 0.5)
         p = 90 / 130
         q = 1 - p
@@ -158,38 +177,27 @@ class TestKellyCriterion:
     def test_kelly_negative_fraction_clamped_to_zero(self):
         ts = TradingStrategy(10000, 10000, 3, "active_kelly", False)
         s = "trend"
-        ts.num_actual_wins[s] = 80
-        ts.num_actual_losses[s] = 50
-        ts.total_gain[s] = 100.0
-        ts.total_loss[s] = 60.0
-        ts.total_estimated_gain[s] = 50.0
-        ts.num_estimated_gains[s] = 130
-        # Tiny estimated_gain relative to average produces negative raw fraction
+        _populate_kelly_data(ts, s, n_wins=80, n_losses=50,
+                             total_gain=100.0, total_loss=60.0,
+                             total_estimated_gain=50.0, n_estimated_gains=130)
         f = ts.kelly_criterion(s, 0.01)
         assert f == 0.0
 
     def test_kelly_zero_estimated_gain(self):
         ts = TradingStrategy(10000, 10000, 3, "active_kelly", False)
         s = "trend"
-        ts.num_actual_wins[s] = 80
-        ts.num_actual_losses[s] = 50
-        ts.total_gain[s] = 100.0
-        ts.total_loss[s] = 60.0
-        ts.total_estimated_gain[s] = 50.0
-        ts.num_estimated_gains[s] = 130
+        _populate_kelly_data(ts, s, n_wins=80, n_losses=50,
+                             total_gain=100.0, total_loss=60.0,
+                             total_estimated_gain=50.0, n_estimated_gains=130)
         assert ts.kelly_criterion(s, 0.0) == 0.0
 
     def test_kelly_passive_zero_potential_trades(self):
         ts = TradingStrategy(10000, 10000, 3, "passive_kelly", False)
         s = "trend"
-        ts.num_actual_wins[s] = 80
-        ts.num_actual_losses[s] = 50
-        ts.num_potential_wins[s] = 0
-        ts.num_potential_losses[s] = 0
-        ts.total_gain[s] = 100.0
-        ts.total_loss[s] = 60.0
-        ts.total_estimated_gain[s] = 50.0
-        ts.num_estimated_gains[s] = 130
+        _populate_kelly_data(ts, s, n_wins=80, n_losses=50,
+                             total_gain=100.0, total_loss=60.0,
+                             n_potential_wins=0, n_potential_losses=0,
+                             total_estimated_gain=50.0, n_estimated_gains=130)
         f = ts.kelly_criterion(s, 0.5)
         assert f == ts.min_kelly_fraction
 
@@ -252,6 +260,21 @@ class TestExecuteTrade:
         ts.execute_trade("mean_reversion", t, "buy_currency_a", 1.25, 1.27, estimated_gain=0.01)
         assert ts.single_slot_positions["mean_reversion"]["type"] is None
 
+    def test_execute_trade_records_kelly_estimated_gain(self):
+        ts = self._make_ts()
+        t = datetime(2023, 6, 1, 10, 0)
+        ts.execute_trade("trend", t, "buy_currency_a", 1.25, 1.27, estimated_gain=0.01)
+        assert len(ts._kelly_estimated_gains["trend"]) == 1
+        day_idx, est = ts._kelly_estimated_gains["trend"][0]
+        assert day_idx == 0
+        assert est == pytest.approx(0.01)
+
+    def test_execute_trade_news_no_kelly_estimated_gain(self):
+        ts = self._make_ts()
+        t = datetime(2023, 6, 1, 10, 0)
+        ts.execute_trade("news_sentiment", t, "buy_currency_a", 1.25, 1.27)
+        assert len(ts._kelly_estimated_gains["news_sentiment"]) == 0
+
 # ---------------------------------------------------------------------------
 # _close_single_position
 # ---------------------------------------------------------------------------
@@ -281,7 +304,8 @@ class TestCloseSinglePosition:
         self._open_long(ts, "trend", 1.26)
         pos = ts.single_slot_positions["trend"]
         ts._close_single_position("trend", pos, sell_price=1.28, buy_price=1.28)
-        assert ts.num_actual_wins["trend"] == 1
+        assert len(ts._kelly_actual_outcomes["trend"]) == 1
+        assert ts._kelly_actual_outcomes["trend"][0][1] > 0
         assert ts.pnl["trend"][-1] > 0
 
     def test_close_long_position_loss(self):
@@ -289,7 +313,8 @@ class TestCloseSinglePosition:
         self._open_long(ts, "trend", 1.26)
         pos = ts.single_slot_positions["trend"]
         ts._close_single_position("trend", pos, sell_price=1.24, buy_price=1.24)
-        assert ts.num_actual_losses["trend"] == 1
+        assert len(ts._kelly_actual_outcomes["trend"]) == 1
+        assert ts._kelly_actual_outcomes["trend"][0][1] < 0
         assert ts.pnl["trend"][-1] < 0
 
     def test_close_short_position_profit(self):
@@ -297,7 +322,8 @@ class TestCloseSinglePosition:
         self._open_short(ts, "model_driven", 1.26)
         pos = ts.single_slot_positions["model_driven"]
         ts._close_single_position("model_driven", pos, sell_price=1.24, buy_price=1.24)
-        assert ts.num_actual_wins["model_driven"] == 1
+        assert len(ts._kelly_actual_outcomes["model_driven"]) == 1
+        assert ts._kelly_actual_outcomes["model_driven"][0][1] > 0
         assert ts.pnl["model_driven"][-1] > 0
 
     def test_close_short_position_loss(self):
@@ -305,8 +331,36 @@ class TestCloseSinglePosition:
         self._open_short(ts, "model_driven", 1.26)
         pos = ts.single_slot_positions["model_driven"]
         ts._close_single_position("model_driven", pos, sell_price=1.28, buy_price=1.28)
-        assert ts.num_actual_losses["model_driven"] == 1
+        assert len(ts._kelly_actual_outcomes["model_driven"]) == 1
+        assert ts._kelly_actual_outcomes["model_driven"][0][1] < 0
         assert ts.pnl["model_driven"][-1] < 0
+
+    def test_close_long_records_kelly_actual_outcome(self):
+        ts = TradingStrategy(10000, 10000, 3, "fixed", False)
+        self._open_long(ts, "trend", 1.26)
+        pos = ts.single_slot_positions["trend"]
+        ts._close_single_position("trend", pos, sell_price=1.28, buy_price=1.28)
+        assert len(ts._kelly_actual_outcomes["trend"]) == 1
+        day_idx, profit = ts._kelly_actual_outcomes["trend"][0]
+        assert day_idx == 0
+        assert profit > 0
+
+    def test_close_short_records_kelly_actual_outcome(self):
+        ts = TradingStrategy(10000, 10000, 3, "fixed", False)
+        self._open_short(ts, "model_driven", 1.26)
+        pos = ts.single_slot_positions["model_driven"]
+        ts._close_single_position("model_driven", pos, sell_price=1.24, buy_price=1.24)
+        assert len(ts._kelly_actual_outcomes["model_driven"]) == 1
+        day_idx, profit = ts._kelly_actual_outcomes["model_driven"][0]
+        assert day_idx == 0
+        assert profit > 0
+
+    def test_close_zero_profit_not_recorded_in_kelly(self):
+        ts = TradingStrategy(10000, 10000, 3, "fixed", False)
+        self._open_long(ts, "trend", 1.26)
+        pos = ts.single_slot_positions["trend"]
+        ts._close_single_position("trend", pos, sell_price=1.26, buy_price=1.26)
+        assert len(ts._kelly_actual_outcomes["trend"]) == 0
 
 # ---------------------------------------------------------------------------
 # _track_potential_outcome
@@ -315,24 +369,40 @@ class TestTrackPotentialOutcome:
     def test_potential_win_buy_positive_change(self, trading_strategy_instance):
         ts = trading_strategy_instance
         ts._track_potential_outcome("trend", "buy_currency_a", 0.01)
-        assert ts.num_potential_wins["trend"] == 1
+        assert len(ts._kelly_potential_outcomes["trend"]) == 1
+        assert ts._kelly_potential_outcomes["trend"][0][1] is True
 
     def test_potential_loss_buy_negative_change(self, trading_strategy_instance):
         ts = trading_strategy_instance
         ts._track_potential_outcome("trend", "buy_currency_a", -0.01)
-        assert ts.num_potential_losses["trend"] == 1
+        assert len(ts._kelly_potential_outcomes["trend"]) == 1
+        assert ts._kelly_potential_outcomes["trend"][0][1] is False
 
     def test_potential_no_trade_no_change(self, trading_strategy_instance):
         ts = trading_strategy_instance
         ts._track_potential_outcome("trend", "no_trade", 0.05)
-        assert ts.num_potential_wins["trend"] == 0
-        assert ts.num_potential_losses["trend"] == 0
+        assert len(ts._kelly_potential_outcomes["trend"]) == 0
 
     def test_potential_zero_change_no_count(self, trading_strategy_instance):
         ts = trading_strategy_instance
         ts._track_potential_outcome("trend", "buy_currency_a", 0.0)
-        assert ts.num_potential_wins["trend"] == 0
-        assert ts.num_potential_losses["trend"] == 0
+        assert len(ts._kelly_potential_outcomes["trend"]) == 0
+
+    def test_potential_win_records_kelly_outcome(self, trading_strategy_instance):
+        ts = trading_strategy_instance
+        ts._track_potential_outcome("trend", "buy_currency_a", 0.01)
+        assert len(ts._kelly_potential_outcomes["trend"]) == 1
+        day_idx, is_win = ts._kelly_potential_outcomes["trend"][0]
+        assert day_idx == 0
+        assert is_win is True
+
+    def test_potential_loss_records_kelly_outcome(self, trading_strategy_instance):
+        ts = trading_strategy_instance
+        ts._track_potential_outcome("trend", "buy_currency_a", -0.01)
+        assert len(ts._kelly_potential_outcomes["trend"]) == 1
+        day_idx, is_win = ts._kelly_potential_outcomes["trend"][0]
+        assert day_idx == 0
+        assert is_win is False
 
 # ---------------------------------------------------------------------------
 # News Overlap
@@ -473,3 +543,134 @@ class TestSimulateTradingWithStrategies:
             [datetime(2023, 6, 1, 10, 0)], [1],
         )
         assert ts.num_trades["news_sentiment"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Kelly Rolling Window
+# ---------------------------------------------------------------------------
+class TestKellyRollingWindow:
+    def test_advance_kelly_day_increments_index(self):
+        ts = TradingStrategy(10000, 10000, 3, "active_kelly", False)
+        assert ts._kelly_day_index == 0
+        ts.advance_kelly_day()
+        assert ts._kelly_day_index == 1
+        ts.advance_kelly_day()
+        assert ts._kelly_day_index == 2
+
+    def test_prune_removes_old_records(self):
+        ts = TradingStrategy(10000, 10000, 3, "active_kelly", False, kelly_window_days=3)
+        s = "trend"
+        for day in range(3):
+            ts._kelly_actual_outcomes[s].append((day, 1.0))
+            ts._kelly_potential_outcomes[s].append((day, True))
+            ts._kelly_estimated_gains[s].append((day, 0.5))
+
+        assert len(ts._kelly_actual_outcomes[s]) == 3
+        # Advance to day 3 → cutoff = 3 - 3 = 0, keep day > 0 → days 1, 2
+        ts._kelly_day_index = 3
+        ts._prune_kelly_history()
+        assert len(ts._kelly_actual_outcomes[s]) == 2
+        assert len(ts._kelly_potential_outcomes[s]) == 2
+        assert len(ts._kelly_estimated_gains[s]) == 2
+        assert all(d > 0 for d, _ in ts._kelly_actual_outcomes[s])
+
+    def test_prune_no_op_when_window_none(self):
+        ts = TradingStrategy(10000, 10000, 3, "active_kelly", False, kelly_window_days=None)
+        s = "trend"
+        for day in range(10):
+            ts._kelly_actual_outcomes[s].append((day, 1.0))
+        ts._kelly_day_index = 100
+        ts._prune_kelly_history()
+        assert len(ts._kelly_actual_outcomes[s]) == 10
+
+    def test_kelly_window_uses_only_recent_days(self):
+        ts = TradingStrategy(10000, 10000, 3, "active_kelly", False, kelly_window_days=2)
+        s = "trend"
+        # Day 0: 60 wins, 60 losses
+        _populate_kelly_data(ts, s, n_wins=60, n_losses=60,
+                             total_gain=60.0, total_loss=60.0,
+                             total_estimated_gain=50.0, n_estimated_gains=120, day=0)
+        # Day 1: 80 wins, 40 losses
+        _populate_kelly_data(ts, s, n_wins=80, n_losses=40,
+                             total_gain=100.0, total_loss=40.0,
+                             total_estimated_gain=50.0, n_estimated_gains=120, day=1)
+        # Advance to day 2 → cutoff = 2 - 2 = 0, prune day 0
+        ts._kelly_day_index = 2
+        ts._prune_kelly_history()
+
+        wins, losses, tg, tl, _, _, _, _ = ts._windowed_kelly_stats(s)
+        assert wins == 80
+        assert losses == 40
+        assert tg == pytest.approx(100.0)
+        assert tl == pytest.approx(40.0)
+
+    def test_kelly_window_none_uses_all_history(self):
+        ts = TradingStrategy(10000, 10000, 3, "active_kelly", False, kelly_window_days=None)
+        s = "trend"
+        for day in range(20):
+            _populate_kelly_data(ts, s, n_wins=5, n_losses=3,
+                                 total_gain=5.0, total_loss=3.0,
+                                 total_estimated_gain=4.0, n_estimated_gains=8, day=day)
+            ts.advance_kelly_day()
+
+        wins, losses, _, _, _, _, _, _ = ts._windowed_kelly_stats(s)
+        assert wins == 100   # 20 * 5
+        assert losses == 60  # 20 * 3
+
+    def test_kelly_adapts_after_day_advance(self):
+        """Kelly fraction changes as old poor-performing days fall out of the window."""
+        ts = TradingStrategy(10000, 10000, 3, "active_kelly", False, kelly_window_days=2)
+        s = "trend"
+
+        # Day 0: terrible performance (30 wins, 90 losses) → low p
+        _populate_kelly_data(ts, s, n_wins=30, n_losses=90,
+                             total_gain=30.0, total_loss=90.0,
+                             total_estimated_gain=50.0, n_estimated_gains=120, day=0)
+
+        f_day0 = ts.kelly_criterion(s, 0.5)
+
+        # Day 1: great performance (100 wins, 20 losses) → high p
+        _populate_kelly_data(ts, s, n_wins=100, n_losses=20,
+                             total_gain=100.0, total_loss=20.0,
+                             total_estimated_gain=50.0, n_estimated_gains=120, day=1)
+
+        # Advance to day 2 → prune day 0
+        ts._kelly_day_index = 2
+        ts._prune_kelly_history()
+
+        f_day1_only = ts.kelly_criterion(s, 0.5)
+
+        # After pruning the bad day 0, the Kelly fraction should be higher
+        assert f_day1_only > f_day0
+
+    def test_kelly_window_days_default_is_none(self, trading_strategy_instance):
+        assert trading_strategy_instance.kelly_window_days is None
+
+    def test_kelly_window_days_configurable(self, trading_strategy_kelly_window):
+        assert trading_strategy_kelly_window.kelly_window_days == 5
+
+    def test_windowed_kelly_stats_empty(self):
+        ts = TradingStrategy(10000, 10000, 3, "active_kelly", False)
+        s = "trend"
+        wins, losses, tg, tl, pw, pl, egs, egc = ts._windowed_kelly_stats(s)
+        assert wins == 0
+        assert losses == 0
+        assert tg == 0.0
+        assert tl == 0.0
+        assert pw == 0
+        assert pl == 0
+        assert egs == 0.0
+        assert egc == 0
+
+    def test_kelly_returns_min_fraction_when_no_estimated_gains(self):
+        """After window prune removes all estimated gains, Kelly falls back to min fraction."""
+        ts = TradingStrategy(10000, 10000, 3, "active_kelly", False, kelly_window_days=1)
+        s = "trend"
+        _populate_kelly_data(ts, s, n_wins=80, n_losses=50,
+                             total_gain=100.0, total_loss=60.0,
+                             total_estimated_gain=50.0, n_estimated_gains=130, day=0)
+        # Advance past the window so all data is pruned
+        ts._kelly_day_index = 2
+        ts._prune_kelly_history()
+        f = ts.kelly_criterion(s, 0.5)
+        assert f == ts.min_kelly_fraction

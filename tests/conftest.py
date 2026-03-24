@@ -108,3 +108,15 @@ def trading_strategy_with_costs():
         bet_sizing="fixed",
         enable_transaction_costs=True,
     )
+
+@pytest.fixture
+def trading_strategy_kelly_window():
+    """TradingStrategy with active Kelly and a 5-day rolling window."""
+    return TradingStrategy(
+        wallet_a=10000,
+        wallet_b=10000,
+        news_hold_minutes=3,
+        bet_sizing="active_kelly",
+        enable_transaction_costs=False,
+        kelly_window_days=5,
+    )

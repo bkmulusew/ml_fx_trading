@@ -170,9 +170,12 @@ def run_ml_based_trading_strategies(fx_trading_config):
         fx_trading_config.BET_SIZING,
         fx_trading_config.ENABLE_TRANSACTION_COSTS,
         fx_trading_config.ALLOW_NEWS_OVERLAP,
+        kelly_window_days=fx_trading_config.KELLY_WINDOW_DAYS,
     )
 
     for date_key, values in sorted(chunked_values.items()):
+        trading_strategy.advance_kelly_day()
+
         prev_mean_reversion_profit = sum(trading_strategy.pnl["mean_reversion"])
         prev_trend_profit = sum(trading_strategy.pnl["trend"])
         prev_model_driven_profit = sum(trading_strategy.pnl["model_driven"])
@@ -293,6 +296,7 @@ def run(args):
     fx_trading_config.ALLOW_NEWS_OVERLAP = args.allow_news_overlap
     fx_trading_config.SENTIMENT_SOURCE = args.sentiment_source
     fx_trading_config.SEED = args.seed
+    fx_trading_config.KELLY_WINDOW_DAYS = args.kelly_window_days
 
     root_dir = os.path.dirname(os.path.abspath(__file__))
     fx_trading_config.OUTPUT_DIR = os.path.join(root_dir, args.output_dir)
@@ -326,6 +330,7 @@ def print_fx_trading_config(config):
     print(f"  Allow News Overlap        : {config.ALLOW_NEWS_OVERLAP}")
     print(f"  Sentiment Source          : {config.SENTIMENT_SOURCE}")
     print(f"  Seed                      : {config.SEED}")
+    print(f"  Kelly Window Days         : {config.KELLY_WINDOW_DAYS}")
     print(f"  Model Name                : {config.MODEL_NAME}")
 
 if __name__ == "__main__":
@@ -401,6 +406,11 @@ if __name__ == "__main__":
         "--allow_news_overlap",
         action="store_true",
         help="Enable overlapping news sentiment trades. When set, multiple news-driven positions may be open at the same time. Default: disabled.")
+    parser.add_argument(
+        "--kelly_window_days",
+        type=int,
+        default=None,
+        help="Rolling window size in days for Kelly criterion stats. Default: None (use all history).")
 
     args = parser.parse_args()
 

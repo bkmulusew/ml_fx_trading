@@ -281,6 +281,62 @@ class TestEvalMetricsOnPipelineOutput:
             assert np.isfinite(result[key])
             assert result[key] >= 0
 
+class TestFullPipelineKellyRollingWindow:
+    def test_kelly_rolling_window_differs_from_full_history(self, tmp_path):
+        """Kelly with a rolling window should produce different sizing than full history."""
+        group_data_by_date = _import_group_data_by_date()
+        rng = np.random.default_rng(99)
+
+        all_timestamps, all_mids, all_bids, all_asks = [], [], [], []
+        price = 1.2550
+        for day_offset in range(5):
+            base = datetime(2023, 6, 1 + day_offset, 7, 0)
+            for minute in range(720):
+                ts = base + timedelta(minutes=minute)
+                price += rng.normal(0, 0.0001)
+                all_timestamps.append(ts)
+                all_mids.append(price)
+                all_bids.append(price - 0.0001)
+                all_asks.append(price + 0.0001)
+
+        predicted_values = [m + 0.0005 for m in all_mids]
+
+        news_ts = [datetime(2023, 6, d, 10, 5) for d in range(1, 6)]
+        news_sents = [1, -1, 1, -1, 1]
+
+        chunked = group_data_by_date(
+            all_timestamps, news_ts, all_mids, predicted_values,
+            all_bids, all_asks, news_sents,
+        )
+
+        def _run_with_window(window):
+            ts = TradingStrategy(
+                10000, 10000, 3, "active_kelly", False,
+                kelly_window_days=window,
+            )
+            for date_key, values in sorted(chunked.items()):
+                ts.advance_kelly_day()
+                ts.simulate_trading_with_strategies(
+                    values["fx_timestamps"], values["true_values"],
+                    values["predicted_values"], values["bid_prices"],
+                    values["ask_prices"], values["news_timestamps"],
+                    values["news_sentiments"],
+                )
+            return ts
+
+        ts_full = _run_with_window(None)
+        ts_windowed = _run_with_window(2)
+
+        for s in ["mean_reversion", "trend", "model_driven"]:
+            assert ts_full.num_trades[s] > 0
+            assert ts_windowed.num_trades[s] > 0
+
+        full_pnl = sum(ts_full.pnl["model_driven"])
+        windowed_pnl = sum(ts_windowed.pnl["model_driven"])
+        assert full_pnl != pytest.approx(windowed_pnl, abs=1e-12), \
+            "Rolling window should produce different PnL than full history"
+
+
 class TestNewsSentimentIntegration:
     def test_news_sentiment_integration(self, tmp_path):
         config = FXTradingConfig()

@@ -10,7 +10,8 @@ import datetime
 class TradingStrategy():
     """Implements different trading strategies using Kelly criterion for optimal bet sizing."""
     def __init__(self, wallet_a, wallet_b, news_hold_minutes, bet_sizing, enable_transaction_costs, 
-                 allow_news_overlap=False, optimize_ensemble=True, n_trials=50, reoptimize_interval=7):
+                 allow_news_overlap=False, optimize_ensemble=True, n_trials=50, reoptimize_interval=7,
+                 kelly_window_days=None):
         self.bet_sizing = bet_sizing
         self.enable_transaction_costs = enable_transaction_costs
         self.allow_news_overlap = allow_news_overlap
@@ -34,15 +35,7 @@ class TradingStrategy():
             'news_sentiment': [],
             'ensemble': []
         }
-        self.total_gain = {'mean_reversion': 0, 'trend': 0, 'model_driven': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.total_loss = {'mean_reversion': 0, 'trend': 0, 'model_driven': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.total_estimated_gain = {'mean_reversion': 0, 'trend': 0, 'model_driven': 0, 'news_sentiment': 0, 'ensemble': 0}
         self.num_trades = {'mean_reversion': 0, 'trend': 0, 'model_driven': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.num_potential_wins = {'mean_reversion': 0, 'trend': 0, 'model_driven': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.num_potential_losses = {'mean_reversion': 0, 'trend': 0, 'model_driven': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.num_actual_wins = {'mean_reversion': 0, 'trend': 0, 'model_driven': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.num_actual_losses = {'mean_reversion': 0, 'trend': 0, 'model_driven': 0, 'news_sentiment': 0, 'ensemble': 0}
-        self.num_estimated_gains = {'mean_reversion': 0, 'trend': 0, 'model_driven': 0, 'news_sentiment': 0, 'ensemble': 0}
         
         # Tracks open positions
         self.single_slot_positions = {
@@ -60,6 +53,13 @@ class TradingStrategy():
         self.min_trades_for_full_kelly = 120  # Minimum trades before using full Kelly
         self.fixed_position_size = 10000  # Fixed position size for training
         self.min_kelly_fraction = 0.005 # Minimum Kelly fraction to use (0.5% of portfolio value)
+        self.kelly_window_days = kelly_window_days  # None = use all history
+        self._kelly_day_index = 0
+
+        strategies = ['mean_reversion', 'trend', 'model_driven', 'news_sentiment', 'ensemble']
+        self._kelly_actual_outcomes = {s: [] for s in strategies}
+        self._kelly_potential_outcomes = {s: [] for s in strategies}
+        self._kelly_estimated_gains = {s: [] for s in strategies}
 
         self.dir_map = {
             'buy_currency_a': 1,
@@ -189,31 +189,78 @@ class TradingStrategy():
             buy_price = sell_price = mid
         return buy_price, sell_price
 
+    def advance_kelly_day(self):
+        """Call at the start of each new trading day to advance the rolling window."""
+        self._kelly_day_index += 1
+        self._prune_kelly_history()
+
+    def _prune_kelly_history(self):
+        """Remove records older than the rolling window to bound memory usage."""
+        if self.kelly_window_days is None:
+            return
+        cutoff = self._kelly_day_index - self.kelly_window_days
+        for s in self._kelly_actual_outcomes:
+            self._kelly_actual_outcomes[s] = [(d, p) for d, p in self._kelly_actual_outcomes[s] if d > cutoff]
+            self._kelly_potential_outcomes[s] = [(d, w) for d, w in self._kelly_potential_outcomes[s] if d > cutoff]
+            self._kelly_estimated_gains[s] = [(d, e) for d, e in self._kelly_estimated_gains[s] if d > cutoff]
+
+    def _windowed_kelly_stats(self, strategy_name):
+        """Compute Kelly input stats from the rolling window."""
+        wins, losses = 0, 0
+        total_gain, total_loss = 0.0, 0.0
+        for _, profit in self._kelly_actual_outcomes[strategy_name]:
+            if profit > 0:
+                wins += 1
+                total_gain += profit
+            elif profit < 0:
+                losses += 1
+                total_loss += abs(profit)
+
+        potential_wins, potential_losses = 0, 0
+        for _, is_win in self._kelly_potential_outcomes[strategy_name]:
+            if is_win:
+                potential_wins += 1
+            else:
+                potential_losses += 1
+
+        est_gain_sum, est_gain_count = 0.0, 0
+        for _, eg in self._kelly_estimated_gains[strategy_name]:
+            est_gain_sum += eg
+            est_gain_count += 1
+
+        return wins, losses, total_gain, total_loss, potential_wins, potential_losses, est_gain_sum, est_gain_count
+
     def kelly_criterion(self, strategy_name, estimated_gain):
-        """Calculate Kelly fraction."""
-        total_actual_trades = self.num_actual_wins[strategy_name] + self.num_actual_losses[strategy_name]
+        """Calculate Kelly fraction using a rolling window of recent days."""
+        wins, losses, total_gain, total_loss, potential_wins, potential_losses, est_gain_sum, est_gain_count = \
+            self._windowed_kelly_stats(strategy_name)
+
+        total_actual_trades = wins + losses
 
         if total_actual_trades < self.min_trades_for_full_kelly:
             return self.min_kelly_fraction
 
         if self.bet_sizing == 'active_kelly':
-            p = self.num_actual_wins[strategy_name] / total_actual_trades
+            p = wins / total_actual_trades
         elif self.bet_sizing == 'passive_kelly':
-            total_potential_trades = self.num_potential_wins[strategy_name] + self.num_potential_losses[strategy_name]
+            total_potential_trades = potential_wins + potential_losses
             if total_potential_trades == 0:
                 return self.min_kelly_fraction
-            p = self.num_potential_wins[strategy_name] / total_potential_trades
+            p = potential_wins / total_potential_trades
 
         q = 1 - p
 
-        avg_gain = (self.total_gain[strategy_name] / self.num_actual_wins[strategy_name]) if self.num_actual_wins[strategy_name] else 1.0
-        avg_loss = (self.total_loss[strategy_name] / self.num_actual_losses[strategy_name]) if self.num_actual_losses[strategy_name] else 1.0
+        avg_gain = (total_gain / wins) if wins else 1.0
+        avg_loss = (total_loss / losses) if losses else 1.0
         win_loss_ratio = avg_gain / avg_loss
 
         if estimated_gain == 0.0:
             return 0.0
 
-        h = abs(estimated_gain) / (self.total_estimated_gain[strategy_name] / self.num_estimated_gains[strategy_name])
+        if est_gain_count == 0:
+            return self.min_kelly_fraction
+
+        h = abs(estimated_gain) / (est_gain_sum / est_gain_count)
 
         f = p - (q / (h * win_loss_ratio))
 
@@ -231,11 +278,10 @@ class TradingStrategy():
         # Sell currency A (short) wins if price goes down (negative pct change)
         if (prev_trade_direction == 'buy_currency_a' and actual_pct_change > 0) or \
            (prev_trade_direction == 'sell_currency_a' and actual_pct_change < 0):
-            self.num_potential_wins[strategy_name] += 1
+            self._kelly_potential_outcomes[strategy_name].append((self._kelly_day_index, True))
         elif (prev_trade_direction == 'buy_currency_a' and actual_pct_change < 0) or \
              (prev_trade_direction == 'sell_currency_a' and actual_pct_change > 0):
-            self.num_potential_losses[strategy_name] += 1
-        # If actual_pct_change == 0, it's neither a win nor a loss, so we don't count it
+            self._kelly_potential_outcomes[strategy_name].append((self._kelly_day_index, False))
 
     def execute_trade(self, strategy_name, fx_timestamp, trade_direction, bid_price, ask_price, estimated_gain=None):
         """Calculate profit/loss and handle position management"""
@@ -320,8 +366,7 @@ class TradingStrategy():
         hold_mins = (self.news_hold_minutes if strategy_name == 'news_sentiment' else self.no_hold)
 
         if strategy_name != 'news_sentiment':
-            self.total_estimated_gain[strategy_name] += abs(estimated_gain)
-            self.num_estimated_gains[strategy_name] += 1
+            self._kelly_estimated_gains[strategy_name].append((self._kelly_day_index, abs(estimated_gain)))
 
         if strategy_name == 'news_sentiment' and self.allow_news_overlap:
             self.multi_slot_positions[strategy_name].append({
@@ -374,12 +419,8 @@ class TradingStrategy():
             self.wallet_b[strategy_name] -= cost_to_buyback_a
             self.wallet_a[strategy_name] += position['size_a']
 
-        if profit_in_curr_a > 0:
-            self.total_gain[strategy_name] += profit_in_curr_a
-            self.num_actual_wins[strategy_name] += 1
-        elif profit_in_curr_a < 0:
-            self.total_loss[strategy_name] += abs(profit_in_curr_a)
-            self.num_actual_losses[strategy_name] += 1
+        if profit_in_curr_a != 0:
+            self._kelly_actual_outcomes[strategy_name].append((self._kelly_day_index, profit_in_curr_a))
 
         # Update profit tracking
         self.num_trades[strategy_name] += 1
