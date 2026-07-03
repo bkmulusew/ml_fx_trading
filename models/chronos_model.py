@@ -30,7 +30,6 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
 
     def predict_future_values(self, input_sequences):
         """Make prediction for a batch of input sequences"""
-
         # Convert to tensor (EVAL_BATCH_SIZE, INPUT_CHUNK_LENGTH)
         batch_array = np.array(input_sequences, dtype=np.float32).squeeze(axis=-1)
         inputs = torch.FloatTensor(batch_array).to(self.device)
@@ -48,7 +47,6 @@ class ChronosFinancialForecastingModel(FinancialForecastingModel):
 
     def generate_predictions(self, data):
         """Generate predictions using sliding window with batching"""
-
         # data shape: (time_steps, 1)
         num_timesteps, _ = data.shape
 

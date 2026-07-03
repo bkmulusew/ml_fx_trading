@@ -11,52 +11,63 @@ class TradingStrategy():
     """Implements different trading strategies using Kelly criterion for optimal bet sizing."""
     def __init__(self, wallet_a, wallet_b, news_hold_minutes, bet_sizing, enable_transaction_costs, 
                  allow_news_overlap=False, optimize_ensemble=True, n_trials=50, reoptimize_interval=7,
-                 kelly_window_days=None):
+                 kelly_window_days=None, min_trades_for_full_kelly=120, min_kelly_fraction=0.005,
+                 fast_ma_window=10, slow_ma_window=30, threshold=0.0):
         self.bet_sizing = bet_sizing
         self.enable_transaction_costs = enable_transaction_costs
         self.allow_news_overlap = allow_news_overlap
         self.optimize_ensemble = optimize_ensemble
         self.n_trials = n_trials
         self.reoptimize_interval = reoptimize_interval  # Days between optimizations
-        
+        self.threshold = threshold
+
         # Minimum number of minutes to hold a position before allowing exit for news sentiment strategy
         self.news_hold_minutes = news_hold_minutes
         self.no_hold = -1
         
+        # Moving average crossover parameters
+        self.fast_ma_window = fast_ma_window
+        self.slow_ma_window = slow_ma_window
+
+        strategies = ['mean_reversion', 'trend', 'ma_crossover', 'model_driven', 'news_sentiment', 'ensemble']
         # Initialize wallets for different trading strategies
-        self.wallet_a = {'mean_reversion': wallet_a, 'trend': wallet_a, 'model_driven': wallet_a, 'news_sentiment': wallet_a, 'ensemble': wallet_a}
-        self.wallet_b = {'mean_reversion': wallet_b, 'trend': wallet_b, 'model_driven': wallet_b, 'news_sentiment': wallet_b, 'ensemble': wallet_b}
-        
+        self.wallet_a = {s: wallet_a for s in strategies}
+        self.wallet_b = {s: wallet_b for s in strategies}
         # Track profit/loss, wins/losses, and total gains/losses for each strategy
-        self.pnl = {
-            'mean_reversion': [],
-            'trend': [],
-            'model_driven': [],
-            'news_sentiment': [],
-            'ensemble': []
-        }
-        self.num_trades = {'mean_reversion': 0, 'trend': 0, 'model_driven': 0, 'news_sentiment': 0, 'ensemble': 0}
-        
-        # Tracks open positions
+        self.pnl = {s: [] for s in strategies}
+        self.num_trades = {s: 0 for s in strategies}
+        # Tracks open positions for each strategy
         self.single_slot_positions = {
-            'mean_reversion': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
-            'trend': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
-            'model_driven': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
-            'news_sentiment': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.news_hold_minutes},
-            'ensemble': {'type': None, 'size_a': 0, 'size_b': 0, 'entry_ratio': 0, 'entry_timestamp': None, 'hold_minutes': self.no_hold},
+            s: {
+                'type': None,
+                'size_a': 0,
+                'size_b': 0,
+                'entry_ratio': 0,
+                'entry_timestamp': None,
+                'hold_minutes': self.no_hold,
+            }
+            for s in strategies
+            if s != 'news_sentiment'
+        }
+        self.single_slot_positions['news_sentiment'] = {
+            'type': None,
+            'size_a': 0,
+            'size_b': 0,
+            'entry_ratio': 0,
+            'entry_timestamp': None,
+            'hold_minutes': self.news_hold_minutes,
         }
         self.multi_slot_positions = {
             'news_sentiment': []  # list of open positions (same shape as a single slot)
         }
-        
+
         # Kelly criterion parameters
-        self.min_trades_for_full_kelly = 120  # Minimum trades before using full Kelly
+        self.min_trades_for_full_kelly = min_trades_for_full_kelly  # Minimum trades before using full Kelly
         self.fixed_position_size = 10000  # Fixed position size for training
-        self.min_kelly_fraction = 0.005 # Minimum Kelly fraction to use (0.5% of portfolio value)
+        self.min_kelly_fraction = min_kelly_fraction # Minimum Kelly fraction to use (0.5% of portfolio value)
         self.kelly_window_days = kelly_window_days  # None = use all history
         self._kelly_day_index = 0
-
-        strategies = ['mean_reversion', 'trend', 'model_driven', 'news_sentiment', 'ensemble']
+        # Tracks actual and potential outcomes for each strategy
         self._kelly_actual_outcomes = {s: [] for s in strategies}
         self._kelly_potential_outcomes = {s: [] for s in strategies}
         self._kelly_estimated_gains = {s: [] for s in strategies}
@@ -439,24 +450,36 @@ class TradingStrategy():
         trade_direction = 'no_trade'
 
         if(strategy_name == "mean_reversion"):
-            if base_pct_change < 0:
+            if base_pct_change < -self.threshold:
                 trade_direction = 'buy_currency_a'
-            elif base_pct_change > 0:
+            elif base_pct_change > self.threshold:
                 trade_direction = 'sell_currency_a'
 
         elif(strategy_name == "trend"):
-            if base_pct_change < 0:
+            if base_pct_change < -self.threshold:
                 trade_direction = 'sell_currency_a'
-            elif base_pct_change > 0:
+            elif base_pct_change > self.threshold:
                 trade_direction = 'buy_currency_a'
 
         elif(strategy_name == "model_driven"):
-            if pred_pct_change < 0:
+            if pred_pct_change < -self.threshold:
                 trade_direction = 'sell_currency_a'
-            elif pred_pct_change > 0:
+            elif pred_pct_change > self.threshold:
                 trade_direction = 'buy_currency_a'
 
         return trade_direction
+
+    def determine_ma_crossover_trade_direction(self, fast_ma_prev, fast_ma_curr, slow_ma_prev, slow_ma_curr):
+        """Determine trade direction based on moving average crossover.
+        
+        Golden cross (fast crosses above slow) → buy currency A.
+        Death cross (fast crosses below slow)  → sell currency A.
+        """
+        if fast_ma_prev <= slow_ma_prev and fast_ma_curr > slow_ma_curr:
+            return 'buy_currency_a'
+        elif fast_ma_prev >= slow_ma_prev and fast_ma_curr < slow_ma_curr:
+            return 'sell_currency_a'
+        return 'no_trade'
 
     def determine_news_sentiment_trade_direction(self, news_sentiment):
         """Determine the trade direction based on news sentiment."""
@@ -470,6 +493,7 @@ class TradingStrategy():
         return trade_direction
 
     def _generate_training_data(self, actual_rates, pred_rates):
+        """Generate training data for the ensemble model."""
         X, y = [], []
         base_pct_incs, pred_pct_incs = TradingUtils.calculate_pct_inc(actual_rates, pred_rates)
         model_keys = list(pred_pct_incs.keys())
@@ -520,6 +544,70 @@ class TradingStrategy():
             # Execute trade
             self.execute_trade(strategy_name, curr_fx_timestamp, trade_direction, curr_bid_price, curr_ask_price, estimated_gain)
 
+    def _execute_ma_crossover_strategy(self, fx_timestamps, actual_rates, bid_prices, ask_prices):
+        """Execute moving average crossover strategy.
+        
+        Computes fast and slow simple moving averages over actual_rates and
+        trades on crossover events.  Requires at least slow_ma_window data
+        points before the first signal can fire.
+        """
+        strategy_name = 'ma_crossover'
+        n = len(actual_rates)
+
+        if n < self.slow_ma_window + 1:
+            return
+
+        rates = np.array(actual_rates, dtype=np.float64)
+
+        fast_cumsum = np.cumsum(rates)
+        slow_cumsum = fast_cumsum.copy()
+        fast_ma = np.empty(n, dtype=np.float64)
+        slow_ma = np.empty(n, dtype=np.float64)
+
+        fast_ma[:self.fast_ma_window - 1] = np.nan
+        slow_ma[:self.slow_ma_window - 1] = np.nan
+
+        for i in range(self.fast_ma_window - 1, n):
+            if i < self.fast_ma_window:
+                fast_ma[i] = fast_cumsum[i] / self.fast_ma_window
+            else:
+                fast_ma[i] = (fast_cumsum[i] - fast_cumsum[i - self.fast_ma_window]) / self.fast_ma_window
+
+        for i in range(self.slow_ma_window - 1, n):
+            if i < self.slow_ma_window:
+                slow_ma[i] = slow_cumsum[i] / self.slow_ma_window
+            else:
+                slow_ma[i] = (slow_cumsum[i] - slow_cumsum[i - self.slow_ma_window]) / self.slow_ma_window
+
+        prev_trade_direction = None
+
+        for i in range(self.slow_ma_window, n - 1):
+            curr_fx_timestamp = fx_timestamps[i]
+            curr_bid_price = bid_prices[i]
+            curr_ask_price = ask_prices[i]
+
+            base_pct_change = (rates[i] - rates[i - 1]) / rates[i - 1] if rates[i - 1] != 0 else 0.0
+
+            if prev_trade_direction is not None:
+                self._track_potential_outcome(strategy_name, prev_trade_direction, base_pct_change)
+
+            trade_direction = self.determine_ma_crossover_trade_direction(
+                fast_ma[i - 1], fast_ma[i], slow_ma[i - 1], slow_ma[i]
+            )
+
+            prev_trade_direction = trade_direction
+
+            # TODO: Fix this
+            # This is a placeholder for the actual estimated gain
+            # We need to calculate the actual estimated gain based on the fast and slow moving averages
+            # and the actual rate
+            # We need to use the actual rate to calculate the estimated gain
+            # We need to use the fast and slow moving averages to calculate the estimated gain
+            # We need to use the actual rate to calculate the estimated gain
+            estimated_gain = abs(fast_ma[i] - slow_ma[i]) / rates[i] if rates[i] != 0 else 0.0
+
+            self.execute_trade(strategy_name, curr_fx_timestamp, trade_direction, curr_bid_price, curr_ask_price, estimated_gain)
+
     def _execute_ensemble_strategy(self, fx_timestamps, actual_rates, pred_rates, bid_prices, ask_prices):
         """Helper method to execute ensemble trading strategy."""
         strategy_name = "ensemble"
@@ -554,9 +642,9 @@ class TradingStrategy():
                 # Inverse transform to get prediction in original scale
                 y_pred = self.scaler_y.inverse_transform([[y_pred_scaled]])[0, 0]
                 
-                if y_pred < 0:
+                if y_pred < -self.threshold:
                     trade_direction = 'sell_currency_a'
-                elif y_pred > 0:
+                elif y_pred > self.threshold:
                     trade_direction = 'buy_currency_a'
                 else:
                     trade_direction = 'no_trade'
@@ -573,6 +661,7 @@ class TradingStrategy():
             self.execute_trade(strategy_name, curr_fx_timestamp, trade_direction, curr_bid_price, curr_ask_price, estimated_gain)
 
     def _maybe_close_position(self, strategy_name, fx_timestamp, bid_price, ask_price):
+        """Helper method to maybe close a position for news sentiment strategy."""
         buy_price, sell_price = self._get_prices(bid_price, ask_price)
 
         if strategy_name == 'news_sentiment' and self.allow_news_overlap:
@@ -595,6 +684,7 @@ class TradingStrategy():
                 self.close_position(strategy_name, sell_price, buy_price)
 
     def _execute_news_sentiment_strategy(self, fx_timestamps, bid_prices, ask_prices, news_timestamps, news_sentiments):
+        """Helper method to execute news sentiment strategy."""
         strategy_name = "news_sentiment"
         MAX_DIFF = datetime.timedelta(seconds=90)
 
@@ -704,6 +794,16 @@ class TradingStrategy():
                 ask_prices_test,
             )
 
+        # MA crossover only needs actual rates (no model predictions)
+        run_ma_crossover = (strategy_names is None or 'ma_crossover' in strategy_names)
+        if run_ma_crossover:
+            self._execute_ma_crossover_strategy(
+                fx_timestamps_test,
+                actual_rates_test,
+                bid_prices_test,
+                ask_prices_test,
+            )
+
         if news_enabled:
             self._execute_news_sentiment_strategy(
                 fx_timestamps_test,
@@ -715,13 +815,14 @@ class TradingStrategy():
 
         # Phase 4: Close remaining positions and calculate results
         all_strategy_names = list(base_strategy_names)
+        if run_ma_crossover:
+            all_strategy_names.append('ma_crossover')
         if news_enabled:
             all_strategy_names.append('news_sentiment')
         self._close_all_remaining_positions(all_strategy_names, bid_prices_test[-1], ask_prices_test[-1])
 
     def simulate_trading_with_ensemble_strategy(self, fx_timestamps, actual_rates, pred_rates, bid_prices, ask_prices, seed=42):
         """Simulate trading over a series of exchange rates using ensemble strategy."""
-
         # Identify all FX timestamps that fall within normal market hours (09:00–17:00)
         in_window_ts = [
             (i, fx_timestamp)

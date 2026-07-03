@@ -22,4 +22,7 @@ class FXTradingConfig:
     ALLOW_NEWS_OVERLAP: bool = False
     SENTIMENT_SOURCE: str = "competitor_label"
     KELLY_WINDOW_DAYS: int = None
+    MIN_TRADES_FOR_FULL_KELLY: int = None
+    MIN_KELLY_FRACTION: float = 0.005
+    THRESHOLD: float = 0.0
     SEED: int = 59

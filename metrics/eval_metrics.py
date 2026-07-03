@@ -31,7 +31,7 @@ class ModelEvalMetrics:
         actual, predicted = np.asarray(actual), np.asarray(predicted)
         return np.sqrt(((predicted - actual) ** 2).mean())
 
-    def calculate_prediction_error(self, actual, predicted):
+    def calculate_prediction_errors(self, actual, predicted):
         """Calculates the prediction error."""
         smape = self.calculate_smape(actual, predicted)
         mape = self.calculate_mape(actual, predicted)

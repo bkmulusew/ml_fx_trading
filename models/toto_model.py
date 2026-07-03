@@ -48,7 +48,6 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
 
     def predict_future_values(self, input_sequences):
         """Make prediction for a batch of input sequences"""
-
         # input_sequences shape: (EVAL_BATCH_SIZE, INPUT_CHUNK_LENGTH, 1)
         batch_size, _, num_features = input_sequences.shape
 
@@ -92,7 +91,6 @@ class TotoFinancialForecastingModel(FinancialForecastingModel):
 
     def generate_predictions(self, data):
         """Generate predictions using sliding window with batching"""
-
         # data shape: (time_steps, 1)
         num_timesteps, _ = data.shape
 

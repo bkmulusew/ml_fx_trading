@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import torch
 import random
 from typing import List, Dict, Union
+from metrics import ModelEvalMetrics
 
 def set_seed(seed):
     torch.manual_seed(seed)
@@ -135,7 +136,13 @@ def run_ml_based_trading_strategies(fx_trading_config):
     else:
         predictor = DartsFinancialForecastingModel(fx_trading_config, processed_data.darts_scaler)
         predictor.train(processed_data.darts_train_scaled, processed_data.darts_val_scaled)
+        # predictor.train(processed_data.darts_train_scaled)
         predicted_values = predictor.generate_predictions(processed_data.darts_test_scaled)
+
+    metrics = ModelEvalMetrics()
+    prediction_errors = None
+    if fx_trading_config.MODEL_NAME != 'ensemble':
+        prediction_errors = metrics.calculate_prediction_errors(true_values, predicted_values)
 
     # Group data by date for trading simulation
     chunked_values = group_data_by_date(
@@ -148,6 +155,7 @@ def run_ml_based_trading_strategies(fx_trading_config):
         test_news_sentiments
     )
 
+    date_key_list = []
     mean_reversion_profit = []
     trend_profit = []
     model_driven_profit = []
@@ -171,6 +179,9 @@ def run_ml_based_trading_strategies(fx_trading_config):
         fx_trading_config.ENABLE_TRANSACTION_COSTS,
         fx_trading_config.ALLOW_NEWS_OVERLAP,
         kelly_window_days=fx_trading_config.KELLY_WINDOW_DAYS,
+        min_trades_for_full_kelly=fx_trading_config.MIN_TRADES_FOR_FULL_KELLY,
+        min_kelly_fraction=fx_trading_config.MIN_KELLY_FRACTION,
+        threshold=fx_trading_config.THRESHOLD,
     )
 
     for date_key, values in sorted(chunked_values.items()):
@@ -226,6 +237,7 @@ def run_ml_based_trading_strategies(fx_trading_config):
         mean_reversion_profit.append(current_mean_reversion_profit - prev_mean_reversion_profit)
         trend_profit.append(current_trend_profit - prev_trend_profit)
         news_sentiment_profit.append(current_news_sentiment_profit - prev_news_sentiment_profit)
+        date_key_list.append(date_key)
 
         if is_ensemble_model:
             ensemble_profit.append(current_ensemble_profit - prev_ensemble_profit)
@@ -267,13 +279,14 @@ def run_ml_based_trading_strategies(fx_trading_config):
 
     plt.clf()
 
-    print(f"Cummulative Mean Reversion Profit: {cumulative_mean_reversion_profit[-1]:.2f}")
-    print(f"Cummulative Trend Profit: {cumulative_trend_profit[-1]:.2f}")
-    print(f"Cummulative News Sentiment Profit: {cumulative_news_sentiment_profit[-1]:.2f}")
+    print(f"\n\n\n")
+    print(f"Prediction Errors: {prediction_errors}")
+    
     if is_ensemble_model:
         print(f"Cummulative Ensemble Profit: {cumulative_ensemble_profit[-1]:.2f}")
     else:
         print(f"Cummulative Model-Driven Profit: {cumulative_model_driven_profit[-1]:.2f}")
+    print(f"\n\n\n")
     
 def run(args):
     """Parse command-line arguments and configure the trading model, then run the trading strategy."""
@@ -297,6 +310,9 @@ def run(args):
     fx_trading_config.SENTIMENT_SOURCE = args.sentiment_source
     fx_trading_config.SEED = args.seed
     fx_trading_config.KELLY_WINDOW_DAYS = args.kelly_window_days
+    fx_trading_config.MIN_TRADES_FOR_FULL_KELLY = args.min_trades_for_full_kelly
+    fx_trading_config.MIN_KELLY_FRACTION = args.min_kelly_fraction
+    fx_trading_config.THRESHOLD = args.threshold
 
     root_dir = os.path.dirname(os.path.abspath(__file__))
     fx_trading_config.OUTPUT_DIR = os.path.join(root_dir, args.output_dir)
@@ -331,7 +347,10 @@ def print_fx_trading_config(config):
     print(f"  Sentiment Source          : {config.SENTIMENT_SOURCE}")
     print(f"  Seed                      : {config.SEED}")
     print(f"  Kelly Window Days         : {config.KELLY_WINDOW_DAYS}")
+    print(f"  Min Trades for Full Kelly : {config.MIN_TRADES_FOR_FULL_KELLY}")
+    print(f"  Min Kelly Fraction        : {config.MIN_KELLY_FRACTION}")
     print(f"  Model Name                : {config.MODEL_NAME}")
+    print(f"  Threshold                 : {config.THRESHOLD}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -411,6 +430,21 @@ if __name__ == "__main__":
         type=int,
         default=None,
         help="Rolling window size in days for Kelly criterion stats. Default: None (use all history).")
+    parser.add_argument(
+        "--min_trades_for_full_kelly",
+        type=int,
+        default=None,
+        help="Minimum number of trades required for full Kelly criterion. Default: None (use all history).")
+    parser.add_argument(
+        "--min_kelly_fraction",
+        type=float,
+        default=0.005,
+        help="Minimum Kelly fraction to use. Default: 0.005 (0.5% of portfolio value).")
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.0,
+        help="Minimum predicted percentage return required to open a position (default: 0.0).")
 
     args = parser.parse_args()
 
