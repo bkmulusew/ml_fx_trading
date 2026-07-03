@@ -461,7 +461,7 @@ if __name__ == "__main__":
         "--threshold",
         type=float,
         default=0.0,
-        help="Minimum predicted percentage return required to open a position (default: 0.0).")
+        help="Minimum predicted percentage return required to open a position. (default: 0.0).")
     parser.add_argument(
         "--fast_ma_window",
         type=int,
