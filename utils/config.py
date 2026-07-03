@@ -25,4 +25,6 @@ class FXTradingConfig:
     MIN_TRADES_FOR_FULL_KELLY: int = None
     MIN_KELLY_FRACTION: float = 0.005
     THRESHOLD: float = 0.0
+    FAST_MA_WINDOW: int = 10
+    SLOW_MA_WINDOW: int = 30
     SEED: int = 59

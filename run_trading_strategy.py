@@ -158,12 +158,14 @@ def run_ml_based_trading_strategies(fx_trading_config):
     date_key_list = []
     mean_reversion_profit = []
     trend_profit = []
+    ma_crossover_profit = []
     model_driven_profit = []
     news_sentiment_profit = []
     ensemble_profit = []
 
     mean_reversion_num_trades = []
     trend_num_trades = []
+    ma_crossover_num_trades = []
     model_driven_num_trades = []
     news_sentiment_num_trades = []
     ensemble_num_trades = []
@@ -182,6 +184,8 @@ def run_ml_based_trading_strategies(fx_trading_config):
         min_trades_for_full_kelly=fx_trading_config.MIN_TRADES_FOR_FULL_KELLY,
         min_kelly_fraction=fx_trading_config.MIN_KELLY_FRACTION,
         threshold=fx_trading_config.THRESHOLD,
+        fast_ma_window=fx_trading_config.FAST_MA_WINDOW,
+        slow_ma_window=fx_trading_config.SLOW_MA_WINDOW,
     )
 
     for date_key, values in sorted(chunked_values.items()):
@@ -189,6 +193,7 @@ def run_ml_based_trading_strategies(fx_trading_config):
 
         prev_mean_reversion_profit = sum(trading_strategy.pnl["mean_reversion"])
         prev_trend_profit = sum(trading_strategy.pnl["trend"])
+        prev_ma_crossover_profit = sum(trading_strategy.pnl["ma_crossover"])
         prev_model_driven_profit = sum(trading_strategy.pnl["model_driven"])
         prev_news_sentiment_profit = sum(trading_strategy.pnl["news_sentiment"])
         prev_ensemble_profit = sum(trading_strategy.pnl["ensemble"])
@@ -230,12 +235,14 @@ def run_ml_based_trading_strategies(fx_trading_config):
 
         current_mean_reversion_profit = sum(trading_strategy.pnl["mean_reversion"])
         current_trend_profit = sum(trading_strategy.pnl["trend"])
+        current_ma_crossover_profit = sum(trading_strategy.pnl["ma_crossover"])
         current_model_driven_profit = sum(trading_strategy.pnl["model_driven"])
         current_news_sentiment_profit = sum(trading_strategy.pnl["news_sentiment"])
         current_ensemble_profit = sum(trading_strategy.pnl["ensemble"])
 
         mean_reversion_profit.append(current_mean_reversion_profit - prev_mean_reversion_profit)
         trend_profit.append(current_trend_profit - prev_trend_profit)
+        ma_crossover_profit.append(current_ma_crossover_profit - prev_ma_crossover_profit)
         news_sentiment_profit.append(current_news_sentiment_profit - prev_news_sentiment_profit)
         date_key_list.append(date_key)
 
@@ -246,6 +253,7 @@ def run_ml_based_trading_strategies(fx_trading_config):
 
     mean_reversion_num_trades.append(trading_strategy.num_trades["mean_reversion"])
     trend_num_trades.append(trading_strategy.num_trades["trend"])
+    ma_crossover_num_trades.append(trading_strategy.num_trades["ma_crossover"])
     news_sentiment_num_trades.append(trading_strategy.num_trades["news_sentiment"])
 
     if is_ensemble_model:
@@ -255,6 +263,7 @@ def run_ml_based_trading_strategies(fx_trading_config):
 
     cumulative_mean_reversion_profit = np.cumsum(mean_reversion_profit)
     cumulative_trend_profit = np.cumsum(trend_profit)
+    cumulative_ma_crossover_profit = np.cumsum(ma_crossover_profit)
     cumulative_news_sentiment_profit = np.cumsum(news_sentiment_profit)
 
     if is_ensemble_model:
@@ -264,6 +273,7 @@ def run_ml_based_trading_strategies(fx_trading_config):
 
     plt.plot(cumulative_mean_reversion_profit, color='purple', label='Mean Reversion Strategy')
     plt.plot(cumulative_trend_profit, color='blue', label='Trend Strategy')
+    plt.plot(cumulative_ma_crossover_profit, color='green', label='MA Crossover Strategy')
     plt.plot(cumulative_news_sentiment_profit, color='black', label=f'News-LLM Strategy ({fx_trading_config.SENTIMENT_SOURCE})')
 
     if is_ensemble_model:
@@ -281,11 +291,14 @@ def run_ml_based_trading_strategies(fx_trading_config):
 
     print(f"\n\n\n")
     print(f"Prediction Errors: {prediction_errors}")
-    
+    print(f"Cummulative Mean Reversion Profit: {cumulative_mean_reversion_profit[-1]:.2f}")
+    print(f"Cummulative Trend Profit: {cumulative_trend_profit[-1]:.2f}")
+    print(f"Cummulative MA Crossover Profit: {cumulative_ma_crossover_profit[-1]:.2f}")
     if is_ensemble_model:
         print(f"Cummulative Ensemble Profit: {cumulative_ensemble_profit[-1]:.2f}")
     else:
         print(f"Cummulative Model-Driven Profit: {cumulative_model_driven_profit[-1]:.2f}")
+    print(f"Cummulative News Sentiment Profit: {cumulative_news_sentiment_profit[-1]:.2f}")
     print(f"\n\n\n")
     
 def run(args):
@@ -313,6 +326,8 @@ def run(args):
     fx_trading_config.MIN_TRADES_FOR_FULL_KELLY = args.min_trades_for_full_kelly
     fx_trading_config.MIN_KELLY_FRACTION = args.min_kelly_fraction
     fx_trading_config.THRESHOLD = args.threshold
+    fx_trading_config.FAST_MA_WINDOW = args.fast_ma_window
+    fx_trading_config.SLOW_MA_WINDOW = args.slow_ma_window
 
     root_dir = os.path.dirname(os.path.abspath(__file__))
     fx_trading_config.OUTPUT_DIR = os.path.join(root_dir, args.output_dir)
@@ -351,6 +366,8 @@ def print_fx_trading_config(config):
     print(f"  Min Kelly Fraction        : {config.MIN_KELLY_FRACTION}")
     print(f"  Model Name                : {config.MODEL_NAME}")
     print(f"  Threshold                 : {config.THRESHOLD}")
+    print(f"  Fast MA Window            : {config.FAST_MA_WINDOW}")
+    print(f"  Slow MA Window            : {config.SLOW_MA_WINDOW}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -445,6 +462,16 @@ if __name__ == "__main__":
         type=float,
         default=0.0,
         help="Minimum predicted percentage return required to open a position (default: 0.0).")
+    parser.add_argument(
+        "--fast_ma_window",
+        type=int,
+        default=10,
+        help="Window size for fast moving average. Default: 10.")
+    parser.add_argument(
+        "--slow_ma_window",
+        type=int,
+        default=30,
+        help="Window size for slow moving average. Default: 30.")
 
     args = parser.parse_args()
 

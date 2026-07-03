@@ -294,10 +294,86 @@ class TradingStrategy():
              (prev_trade_direction == 'sell_currency_a' and actual_pct_change > 0):
             self._kelly_potential_outcomes[strategy_name].append((self._kelly_day_index, False))
 
-    def execute_trade(self, strategy_name, fx_timestamp, trade_direction, bid_price, ask_price, estimated_gain=None):
-        """Calculate profit/loss and handle position management"""
+    def _handle_ma_crossover_single_slot(
+        self,
+        fx_timestamp,
+        trade_direction,
+        buy_price,
+        sell_price,
+        estimated_gain,
+        fast_ma_curr,
+        slow_ma_curr,
+    ):
+        """MA crossover single slot.
+
+        If flat, open from ``trade_direction``. If in a trade, close and reopen from
+        ``trade_direction`` only when MAs match or the signal opposes the position; otherwise
+        append zero PnL for this bar and return.
+
+        Returns True if an open or close/reopen occurred this bar.
+        """
+        strategy_name = 'ma_crossover'
+        position = self.single_slot_positions[strategy_name]
+
+        # Flat → follow crossover signal only.
+        if position['type'] is None:
+            self._open_single_position(
+                strategy_name, fx_timestamp, trade_direction, buy_price, sell_price, estimated_gain
+            )
+            return self.single_slot_positions[strategy_name]['type'] is not None
+
+        mas_touch = self._ma_crossover_mas_equal(fast_ma_curr, slow_ma_curr)
+        is_long = position['type'] == 'long'
+        is_short = position['type'] == 'short'
+        opposing_crossover = (is_long and trade_direction == 'sell_currency_a') or (
+            is_short and trade_direction == 'buy_currency_a'
+        )
+        exit_merit = mas_touch or opposing_crossover
+
+        if not exit_merit:
+            self.pnl[strategy_name].append(0.0)
+            return False
+
+        self.close_position(strategy_name, sell_price, buy_price)
+        self._open_single_position(
+            strategy_name, fx_timestamp, trade_direction, buy_price, sell_price, estimated_gain
+        )
+        return True
+
+    def execute_trade(
+        self,
+        strategy_name,
+        fx_timestamp,
+        trade_direction,
+        bid_price,
+        ask_price,
+        estimated_gain=None,
+        fast_ma_curr=None,
+        slow_ma_curr=None,
+    ):
+        """Calculate profit/loss and handle position management.
+
+        For ``ma_crossover`` only: pass ``fast_ma_curr`` and ``slow_ma_curr`` for this bar so exits
+        (MA touch vs position, opposing crossover) can be decided here together with opens/closes.
+        """
         # Determine pricing based on transaction costs setting
         buy_price, sell_price = self._get_prices(bid_price, ask_price)
+
+        # -------- MA crossover (single-slot; holds across bars until exit rule fires) --------
+        if strategy_name == 'ma_crossover':
+            if fast_ma_curr is None or slow_ma_curr is None:
+                raise ValueError(
+                    "execute_trade for ma_crossover requires keyword arguments fast_ma_curr and slow_ma_curr"
+                )
+            return self._handle_ma_crossover_single_slot(
+                fx_timestamp,
+                trade_direction,
+                buy_price,
+                sell_price,
+                estimated_gain if estimated_gain is not None else 0.0,
+                fast_ma_curr,
+                slow_ma_curr,
+            )
 
         # -------- NEWS (overlap path) --------
         if strategy_name == 'news_sentiment' and self.allow_news_overlap:
@@ -481,6 +557,11 @@ class TradingStrategy():
             return 'sell_currency_a'
         return 'no_trade'
 
+    @staticmethod
+    def _ma_crossover_mas_equal(fast_ma_curr, slow_ma_curr):
+        """True when fast and slow SMA are equal (within floating-point tolerance)."""
+        return np.isclose(fast_ma_curr, slow_ma_curr)
+
     def determine_news_sentiment_trade_direction(self, news_sentiment):
         """Determine the trade direction based on news sentiment."""
         trade_direction = 'no_trade'
@@ -595,18 +676,38 @@ class TradingStrategy():
                 fast_ma[i - 1], fast_ma[i], slow_ma[i - 1], slow_ma[i]
             )
 
-            prev_trade_direction = trade_direction
+            if trade_direction != 'no_trade':
+                fast_window_return = abs(
+                    (rates[i] - rates[i - self.fast_ma_window]) / rates[i - self.fast_ma_window]
+                )
+                slow_window_return = abs(
+                    (rates[i] - rates[i - self.slow_ma_window]) / rates[i - self.slow_ma_window]
+                )
+                estimated_gain = min(fast_window_return, slow_window_return)
+            else:
+                estimated_gain = 0.0
 
-            # TODO: Fix this
-            # This is a placeholder for the actual estimated gain
-            # We need to calculate the actual estimated gain based on the fast and slow moving averages
-            # and the actual rate
-            # We need to use the actual rate to calculate the estimated gain
-            # We need to use the fast and slow moving averages to calculate the estimated gain
-            # We need to use the actual rate to calculate the estimated gain
-            estimated_gain = abs(fast_ma[i] - slow_ma[i]) / rates[i] if rates[i] != 0 else 0.0
+            trade_placed = self.execute_trade(
+                strategy_name,
+                curr_fx_timestamp,
+                trade_direction,
+                curr_bid_price,
+                curr_ask_price,
+                estimated_gain,
+                fast_ma_curr=fast_ma[i],
+                slow_ma_curr=slow_ma[i],
+            )
 
-            self.execute_trade(strategy_name, curr_fx_timestamp, trade_direction, curr_bid_price, curr_ask_price, estimated_gain)
+            if trade_placed:
+                pos_type = self.single_slot_positions[strategy_name]['type']
+                if pos_type == 'long':
+                    prev_trade_direction = 'buy_currency_a'
+                elif pos_type == 'short':
+                    prev_trade_direction = 'sell_currency_a'
+                else:
+                    prev_trade_direction = None
+            else:
+                prev_trade_direction = None
 
     def _execute_ensemble_strategy(self, fx_timestamps, actual_rates, pred_rates, bid_prices, ask_prices):
         """Helper method to execute ensemble trading strategy."""
