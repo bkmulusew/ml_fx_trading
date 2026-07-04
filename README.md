@@ -49,7 +49,7 @@ Trading strategies: mean reversion, trend, MA crossover, model driven, news sent
 Position sizing: fixed, Active Kelly, Passive Kelly
         |
         v
-Evaluation: cumulative profit, Sharpe ratio, drawdown, skewness, permutation tests
+Evaluation: cumulative profit
 ```
 
 ## Key Features
@@ -63,7 +63,7 @@ Evaluation: cumulative profit, Sharpe ratio, drawdown, skewness, permutation tes
 
 ## Dataset
 
-Before training or evaluating models and running trading simulations, prepare two datasets: one for FX market data and one for news sentiment data.
+Before training or evaluating models and running trading simulations, prepare two datasets: one for FX market data and one for news sentiment data. Don't have FX price or news sentiment data on hand? The [dataset](https://github.com/bkmulusew/ml_fx_trading/tree/main/dataset) folder in this repo includes ready to use FX prices and news sentiments so you can run the pipeline end to end right after cloning, before plugging in your own data.
 
 ### FX Dataset
 
@@ -102,7 +102,7 @@ Multiple sentiment columns are provided so you can experiment with different lab
 
 ## Installation
 
-This project requires Python **3.11.8** and the dependencies listed in `requirements.txt`. We recommend [conda](https://docs.conda.io/en/latest/) for environment management.
+This project requires Python **3.11.8** and the dependencies listed in [requirements.txt](https://github.com/bkmulusew/ml_fx_trading/blob/main/requirements.txt). We recommend [conda](https://docs.conda.io/en/latest/) for environment management.
 
 ### 1. Create a Conda Environment
 
